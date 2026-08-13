@@ -67,7 +67,7 @@ dsh --profile <name>
 | v0.2 UI 操作闭环 | tap 聚焦 → input 输入 → dump 验证文本回显 ✓（模拟器实测） |
 | v0.2 应用生命周期 | stop → clear-data → uninstall → install → start 全链路 ✓（模拟器实测） |
 | v0.2 崩溃抓取 | jscrash 按包名过滤返回源码级堆栈 ✓（模拟器）；无崩溃时优雅返回 ✓（真机） |
-| v0.2 实机登录全流程 | 拉起 → dump 定位 → 分段输入 → 校验 → 点登录 → 服务端响应 ✓（真机实测；响应 502 属后端问题） |
+| v0.2 实机登录流程 | 拉起 → dump 定位 → 分段输入 → 校验 → 点登录、请求发出 ✓（真机实测） |
 
 ## 已知限制 / Known limitations
 
