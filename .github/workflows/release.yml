@@ -1,0 +1,44 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create a release for (e.g. v0.4.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.TAG }}"
+          NOTES=".github/release-notes/$TAG.md"
+          if [ -f "$NOTES" ]; then
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TAG" --notes-file "$NOTES" || true
+          else
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "$TAG" --generate-notes || true
+          fi
+          # A tag re-push must not fail the run when the release already exists;
+          # just make sure it is not left as a draft.
+          gh release edit "$TAG" --repo "${{ github.repository }}" --draft=false || true
