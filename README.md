@@ -1,7 +1,7 @@
 # dsh-hdc-bridge
 
-> DSH 原生鸿蒙设备桥：通过 `hdc` 让 Agent 在会话内完成「看设备 → 截图 → 看图 → 改码 → 装包 → 再看」的闭环调试。
-> A DSH-native HarmonyOS device bridge: hdc tools for the agent loop (inspect → screenshot → view → fix → install → verify).
+> DSH 原生鸿蒙开发助手：`hdc` 设备闭环（看设备 → 截图 → 看图 → 改码 → 装包 → 再看）＋ 官方优先、按 API 版本分类的知识层 ＋ 可选官方 DevEco CLI 构建/签名通道。
+> A DSH-native HarmonyOS dev assistant: the hdc device loop (inspect → screenshot → view → fix → install → verify), an official-first version-classified knowledge layer, and an optional official DevEco CLI build/sign backend.
 
 ## 定位
 
@@ -28,8 +28,14 @@
 | `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤，并解析结构化摘要（错误名/信息/错误码/源码帧/已知错误码提示） |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
 | 错误码提示 | install / app 失败时按错误码附中文修复建议（如 9568332 → 登记设备 UDID） |
-| `hdc-bridge` 技能 | 附带运行时技能：本插件的调试闭环用法与实测经验，模型可按需加载 |
-| 知识搭配 | ArkTS/ArkUI/API 12-23 离线知识推荐搭配 [harmony-next.skills](https://github.com/linhay/harmony-next.skills)（`npx skills add linhay/harmony-next.skills`） |
+| `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警 |
+| `hms_build` | 官方构建/签名/运行通道：status / build / run / sign / clean；devecocli 缺失时自动回退本机 hvigorw + hdc_install + hdc_app 闭环 |
+| `hms_api` | 官方优先的版本化 API 知识：读本机 SDK `.d.ts`（`@since`/`@deprecated`/`@syscap` 精确到 API 版本），按目标版本分类"可用/已废弃/不可用" |
+| `hms_docs` | 官方本地文档检索：`devecocli docs` search / read / catalog |
+| `hms_api_change` | 官方跨版本破坏性变更扫描：`devecocli check compat`（versions / diff）——回答"知识在哪一版变了" |
+| `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint） |
+| 运行时技能 | `hdc-bridge`（设备闭环用法）、`deveco-cli`（官方 SKILL.md 改写，MIT 声明保留）、`harmonyos-knowledge`（知识层纪律：官方优先、版本化、许可合规），模型按需加载 |
+| 可选知识搭配 | Tier-2 社区包 [harmony-next.skills](https://github.com/linhay/harmony-next.skills)（无 LICENSE，不随包，用户自行 `npx skills add linhay/harmony-next.skills`） |
 
 ## 安装 / Installation
 
@@ -50,6 +56,14 @@ dsh --profile <name>
 - HarmonyOS 设备/模拟器；真机需开发者模式 + USB 调试
 - hdc 二进制自动探测：DevEco Studio 常见 SDK 路径（`<DevEco>\sdk\<apiVer>\openharmony\toolchains\hdc.exe`，apiVer 覆盖 default/10…18）→ PATH（`where.exe` / `Get-Command` / `which`）
 - 截图查看需图像输入模型；纯文本模型可用 `hdc_ui_dump` 做文本化 UI 检查
+- 可选后端 `@deveco/deveco-cli`（MIT）随插件作为 optionalDependency 自动安装（pnpm 失败容忍）；构建/签名/lint 的 `--format json` 能力需本机 DevEco Studio ≥ 6.1.0（macOS/Windows，Node ≥ 18）。签名前需一次人工 `devecocli auth login`（浏览器 OAuth）
+- `hms_api` / `hms_lint rules` 直接读本机 DevEco Studio/SDK 安装（零再分发）；未装 Studio 时这两项降级并给出指引
+
+## 依赖与许可合规
+
+- 所有运行时依赖显式声明；本包代码保持零第三方 npm 依赖（解析器全部手写）
+- 引用资源严格分三类并记录于 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)（机器源 `notices.json`）：① 随装依赖（devecocli，MIT）；② 改写内容（`deveco-cli` 技能改编自官方 SKILL.md，MIT 版权声明保留）；③ 仅引用不分发（SDK .d.ts、codelinter 规则、harmony-next.skills 等——本机读取或链接指路）
+- 发布前跑 `npm run license-check` 门禁：白名单校验（MIT/Apache-2.0/CC-BY-4.0/ISC/BSD/0BSD）、依赖声明与 notices 一致性、改写内容版权行存在性
 
 ## 权限与沙箱
 
@@ -85,8 +99,10 @@ dsh --profile <name>
 ## 路线图
 
 - [ ] 会话头部设备面板（实验版已用动态插件形态验证；正式版走 Typert Remote 通道后发布）
-- [ ] DevEco CLI（devecocli）构建/签名封装，替代裸 hvigor 的缓存升级需求
+- [x] DevEco CLI（devecocli）构建/签名封装（v0.4：可选后端 + hvigorw 降级）
+- [x] 官方优先版本化知识层（v0.4：SDK .d.ts + 官方文档检索 + 跨版本变更扫描 + 官方 lint 规则）
 - [ ] macOS 实机验证
+- [ ] 按 API 版本整理的官方知识节选随包内置（Tier-1 扩展；仅收录许可允许的内容）
 
 ## License
 

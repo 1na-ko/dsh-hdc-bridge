@@ -1,7 +1,7 @@
 {
   "name": "dsh-hdc-bridge",
-  "version": "0.3.1",
-  "description": "DSH-native HarmonyOS device bridge: hdc tools for agent-driven debugging (list targets, connect, shell, screenshot, install, hilog, ui dump, diag).",
+  "version": "0.4.0",
+  "description": "DSH-native HarmonyOS dev-assistant plugin: hdc device bridge, official-first versioned API docs (SDK .d.ts), and an optional DevEco CLI backend for build/sign/lint.",
   "author": "inako",
   "repository": {
     "type": "git",
@@ -14,11 +14,20 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/host.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "notices.json",
+    "scripts/license-check.mjs"
   ],
+  "optionalDependencies": {
+    "@deveco/deveco-cli": "^1.2.2"
+  },
+  "scripts": {
+    "license-check": "node scripts/license-check.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

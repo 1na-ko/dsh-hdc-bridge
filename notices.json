@@ -1,0 +1,50 @@
+{
+  "incorporatedDependencies": [
+    {
+      "id": "deveco-cli",
+      "package": "@deveco/deveco-cli",
+      "version": "^1.2.2",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Huawei Device Co., Ltd.",
+      "source": "https://gitcode.com/openharmony-sig/deveco-cli",
+      "usage": "Optional backend for build/sign/lint/docs tools (hms_build, hms_lint, hms_docs). Declared as an optionalDependency so it installs alongside the plugin; never bundled into the tarball."
+    }
+  ],
+  "derivedContent": [
+    {
+      "id": "deveco-cli-skill",
+      "name": "deveco-cli runtime skill (lib/skills.mjs)",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Huawei Device Co., Ltd.",
+      "source": "https://gitcode.com/openharmony-sig/deveco-cli/blob/develop/SKILL.md",
+      "usage": "Adaptation (translated summary, not verbatim copy) of the official SKILL.md command reference. The copyright and permission notice is reproduced in the skill content."
+    }
+  ],
+  "referenceOnly": [
+    {
+      "id": "harmony-next-skills",
+      "name": "linhay/harmony-next.skills",
+      "reason": "The repository has no license file, so it cannot be redistributed. Linked in README and skill text only, never copied into this package."
+    },
+    {
+      "id": "codelinter-rules",
+      "name": "DevEco Studio codelinter rules (Apache-2.0, Copyright (c) 2024 Huawei Device Co., Ltd.)",
+      "reason": "Read from the user's local DevEco Studio install at runtime (hms_lint rules action); never redistributed."
+    },
+    {
+      "id": "sdk-dts",
+      "name": "HarmonyOS SDK .d.ts API declarations in a local DevEco Studio install",
+      "reason": "Read from the user's local SDK install at runtime (hms_api); never redistributed."
+    },
+    {
+      "id": "hypium-hamock",
+      "name": "@ohos/hypium, @ohos/hamock (Apache-2.0, distributed via ohpm/Gitee)",
+      "reason": "Referenced by name in guidance only."
+    },
+    {
+      "id": "open-deveco",
+      "name": "open-deveco/* (deveco-toolbox and its skills repositories)",
+      "reason": "No license in the repositories; excluded entirely."
+    }
+  ]
+}
