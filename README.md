@@ -67,6 +67,17 @@ dsh --profile <name>
 | v0.2 UI 操作闭环 | tap 聚焦 → input 输入 → dump 验证文本回显 ✓（模拟器实测） |
 | v0.2 应用生命周期 | stop → clear-data → uninstall → install → start 全链路 ✓（模拟器实测） |
 | v0.2 崩溃抓取 | jscrash 按包名过滤返回源码级堆栈 ✓（模拟器）；无崩溃时优雅返回 ✓（真机） |
+| v0.2 实机登录全流程 | 拉起 → dump 定位 → 分段输入 → 校验 → 点登录 → 服务端响应 ✓（真机实测；响应 502 属后端问题） |
+
+## 已知限制 / Known limitations
+
+- `snapshot_display` 仅支持 `.jpeg`（API 10+ 实测；API 24 真机 2800×1840 已验证）
+- 真机安装需签名 profile 绑定设备 UDID，否则报 `9568332 install sign info inconsistent`（应用签名问题，非插件问题）
+- hdc 客户端对远端失败可能仍返回退出码 0，插件以输出标记 + 落盘校验兜底
+- **UI 输入实战经验（真机实测）**：
+  - 混合字符串（数字→字母→数字）注入时，IME 模式切换会稳定吞掉紧跟字母后的第一个字符；规避：分段输入 + `hdc_ui_dump` 校验 + 缺失字符单独补发
+  - 软键盘会改变页面布局：每次点击/输入前使用最新 dump 的坐标，否则可能点到键盘区
+  - 键盘可能遮住按钮：先 `hdc_ui action=key key=Back` 收起键盘，再按新坐标点击
 
 ## 路线图
 
