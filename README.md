@@ -28,7 +28,8 @@
 | `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤，并解析结构化摘要（错误名/信息/错误码/源码帧/已知错误码提示） |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
 | 错误码提示 | install / app 失败时按错误码附中文修复建议（如 9568332 → 登记设备 UDID） |
-| `harmonyos-dev` 技能 | 附带运行时技能：ArkTS 要点、常见错误码与调试闭环用法，模型可按需加载 |
+| `hdc-bridge` 技能 | 附带运行时技能：本插件的调试闭环用法与实测经验，模型可按需加载 |
+| 知识搭配 | ArkTS/ArkUI/API 12-23 离线知识推荐搭配 [harmony-next.skills](https://github.com/linhay/harmony-next.skills)（`npx skills add linhay/harmony-next.skills`） |
 
 ## 安装 / Installation
 

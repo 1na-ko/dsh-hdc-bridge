@@ -1,6 +1,6 @@
 {
   "name": "dsh-hdc-bridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "DSH-native HarmonyOS device bridge: hdc tools for agent-driven debugging (list targets, connect, shell, screenshot, install, hilog, ui dump, diag).",
   "author": "inako",
   "repository": {
