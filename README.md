@@ -22,11 +22,13 @@
 | `hdc_install` | 安装 .hap（默认 -r；输出标记级失败检测） |
 | `hdc_hilog` | hilog 尾部 N 行（可选域名 `-T` 过滤，如 PARAM） |
 | `hdc_ui_dump` | 文本化 UI 快照：uitest 布局树 → 可见文本节点（纯文本模型的「文字截图」） |
+| `hdc_ui_find` | 按文本/hint 找控件：返回 bounds 与中心坐标，配合 tap 免手算坐标 |
 | `hdc_ui` | UI 操作：tap / doubleTap / longPress / swipe / input / key（Back/Home/Power/keyID），配合 dump 形成「观察 → 操作 → 验证」闭环 |
 | `hdc_app` | 应用管理：query / start / stop / clear-data / uninstall（破坏性动作已标注） |
-| `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤 |
+| `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤，并解析结构化摘要（错误名/信息/错误码/源码帧/已知错误码提示） |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
 | 错误码提示 | install / app 失败时按错误码附中文修复建议（如 9568332 → 登记设备 UDID） |
+| `harmonyos-dev` 技能 | 附带运行时技能：ArkTS 要点、常见错误码与调试闭环用法，模型可按需加载 |
 
 ## 安装 / Installation
 
