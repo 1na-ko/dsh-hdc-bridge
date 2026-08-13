@@ -22,7 +22,11 @@
 | `hdc_install` | 安装 .hap（默认 -r；输出标记级失败检测） |
 | `hdc_hilog` | hilog 尾部 N 行（可选域名 `-T` 过滤，如 PARAM） |
 | `hdc_ui_dump` | 文本化 UI 快照：uitest 布局树 → 可见文本节点（纯文本模型的「文字截图」） |
+| `hdc_ui` | UI 操作：tap / doubleTap / longPress / swipe / input / key（Back/Home/Power/keyID），配合 dump 形成「观察 → 操作 → 验证」闭环 |
+| `hdc_app` | 应用管理：query / start / stop / clear-data / uninstall（破坏性动作已标注） |
+| `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤 |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
+| 错误码提示 | install / app 失败时按错误码附中文修复建议（如 9568332 → 登记设备 UDID） |
 
 ## 安装 / Installation
 
@@ -59,7 +63,10 @@ dsh --profile <name>
 | 双目标（USB + TCP 模拟器） | 列表/覆盖/默认目标选择 ✓ |
 | 无设备 | 结构化降级 + 连接指引 ✓ |
 | 装包（签名已绑定 UDID） | 双目标安装成功 + 应用启动 + UI 文本验证 ✓ |
-| 装包签名未绑定 UDID | 结构化上报 `9568332` ✓ |
+| 装包签名未绑定 UDID | 结构化上报 `9568332` + 修复提示 ✓ |
+| v0.2 UI 操作闭环 | tap 聚焦 → input 输入 → dump 验证文本回显 ✓（模拟器实测） |
+| v0.2 应用生命周期 | stop → clear-data → uninstall → install → start 全链路 ✓（模拟器实测） |
+| v0.2 崩溃抓取 | jscrash 按包名过滤返回源码级堆栈 ✓（模拟器）；无崩溃时优雅返回 ✓（真机） |
 
 ## 路线图
 
