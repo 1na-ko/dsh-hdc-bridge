@@ -1,0 +1,39 @@
+{
+  "name": "dsh-hdc-bridge",
+  "version": "0.1.0",
+  "description": "DSH-native HarmonyOS device bridge: hdc tools for agent-driven debugging (list targets, connect, shell, screenshot, install, hilog, ui dump, diag).",
+  "author": "inako",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1na-ko/dsh-hdc-bridge.git"
+  },
+  "type": "module",
+  "main": "lib/host.js",
+  "exports": {
+    ".": { "default": "./lib/host.js" },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/host.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "harmonyos",
+    "openharmony",
+    "arkts",
+    "hdc",
+    "plugin",
+    "agent"
+  ],
+  "license": "MIT"
+}

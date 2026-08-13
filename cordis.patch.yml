@@ -1,0 +1,3 @@
+- insert:
+    - id: hdc-bridge
+      name: dsh-hdc-bridge
