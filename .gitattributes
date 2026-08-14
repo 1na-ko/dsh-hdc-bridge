@@ -1,0 +1,3 @@
+# Vendored official docs are verbatim excerpts (CC-BY-4.0): store bytes as-is so the
+# recorded sha256 in knowledge/index.json stays valid across checkouts.
+knowledge/*.md -text

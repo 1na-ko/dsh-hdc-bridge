@@ -18,6 +18,14 @@
       "copyright": "Copyright (c) 2026 Huawei Device Co., Ltd.",
       "source": "https://gitcode.com/openharmony-sig/deveco-cli/blob/develop/SKILL.md",
       "usage": "Adaptation (translated summary, not verbatim copy) of the official SKILL.md command reference. The copyright and permission notice is reproduced in the skill content."
+    },
+    {
+      "id": "openharmony-docs-tier1",
+      "name": "Tier-1 bundled official knowledge excerpts (knowledge/*.md, verbatim zh-CN docs)",
+      "license": "CC-BY-4.0",
+      "copyright": "OpenHarmony documentation (openharmony/docs, © OpenHarmony Project Contributors), CC-BY-4.0 — https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://gitee.com/openharmony/docs",
+      "usage": "Verbatim excerpts (no modifications) of the most-used API references and app-model/ArkTS guides, bundled under knowledge/ for offline use (hms_knowledge). Per-file provenance (source commit, sha256, source URL) is recorded in knowledge/index.json; the attribution line is reproduced in lib/knowledge.mjs."
     }
   ],
   "referenceOnly": [

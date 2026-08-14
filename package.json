@@ -1,7 +1,7 @@
 {
   "name": "dsh-hdc-bridge",
-  "version": "0.4.0",
-  "description": "DSH-native HarmonyOS dev-assistant plugin: hdc device bridge, official-first versioned API docs (SDK .d.ts), and an optional DevEco CLI backend for build/sign/lint.",
+  "version": "0.5.0",
+  "description": "DSH-native HarmonyOS dev-assistant plugin: hdc device bridge, official-first versioned API docs (SDK .d.ts + offline bundled Tier-1 knowledge), and an optional DevEco CLI backend for build/sign/lint.",
   "author": "inako",
   "repository": {
     "type": "git",
@@ -15,6 +15,7 @@
   },
   "files": [
     "lib",
+    "knowledge",
     "cordis.patch.yml",
     "README.md",
     "LICENSE",

@@ -1,0 +1,341 @@
+{
+  "format": 1,
+  "name": "dsh-hdc-bridge Tier-1 bundled official knowledge excerpts",
+  "source": "https://gitee.com/openharmony/docs",
+  "branch": "master",
+  "sourceSha": "b84779874332bd7c2afee0ca3875494fa4793f1f",
+  "language": "zh-CN",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "Content excerpted VERBATIM (no modifications) from the OpenHarmony documentation project (openharmony/docs, © OpenHarmony Project Contributors), licensed under CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/).",
+  "generatedAt": "2026-08-14T06:13:01.159Z",
+  "totalBytes": 1207110,
+  "entries": [
+    {
+      "id": "promptAction",
+      "kind": "module",
+      "module": "@ohos.promptAction",
+      "title": "@ohos.promptAction (弹窗)",
+      "file": "js-apis-promptAction.md",
+      "bytes": 97591,
+      "sha256": "bd6aeefbd1ebb305ff84f12971d0bae6a99d14146220ac7b9c407e3d671f1e25",
+      "since": 9,
+      "headingCount": 39,
+      "tags": [
+        "toast",
+        "dialog",
+        "提示框",
+        "ui交互"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-arkui/js-apis-promptAction.md"
+    },
+    {
+      "id": "router",
+      "kind": "module",
+      "module": "@ohos.router",
+      "title": "@ohos.router (页面路由)(不推荐)",
+      "file": "js-apis-router.md",
+      "bytes": 76248,
+      "sha256": "64ad10401ade628f6f60dbf46b24788257fc97e600c5a044dc956a0200873903",
+      "since": 8,
+      "headingCount": 40,
+      "tags": [
+        "页面跳转",
+        "路由",
+        "navigation"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-arkui/js-apis-router.md"
+    },
+    {
+      "id": "notificationManager",
+      "kind": "module",
+      "module": "@ohos.notificationManager",
+      "title": "@ohos.notificationManager (NotificationManager模块)",
+      "file": "js-apis-notificationManager.md",
+      "bytes": 91300,
+      "sha256": "93f66f621dc09e15b57c3c57b32b1b7ecb0c01599fff4e32b2a1d9b5ab5acb89",
+      "since": 9,
+      "headingCount": 66,
+      "tags": [
+        "通知",
+        "notification"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-notification-kit/js-apis-notificationManager.md"
+    },
+    {
+      "id": "vibrator",
+      "kind": "module",
+      "module": "@ohos.vibrator",
+      "title": "@ohos.vibrator (振动)",
+      "file": "js-apis-vibrator.md",
+      "bytes": 83299,
+      "sha256": "a2f4d3e0cb0e56830906345befa84c8430ff6f8647d57d3d85fbfacc456b4643",
+      "since": 8,
+      "headingCount": 48,
+      "tags": [
+        "振动",
+        "马达"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-sensor-service-kit/js-apis-vibrator.md"
+    },
+    {
+      "id": "batteryInfo",
+      "kind": "module",
+      "module": "@ohos.batteryInfo",
+      "title": "@ohos.batteryInfo (电量信息)",
+      "file": "js-apis-battery-info.md",
+      "bytes": 8095,
+      "sha256": "5ff204129b22dcdd5b90539de7f8d53c0155681735058a5c83d2f699c1cb22d6",
+      "since": 6,
+      "headingCount": 7,
+      "tags": [
+        "电量",
+        "电池"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-basic-services-kit/js-apis-battery-info.md"
+    },
+    {
+      "id": "deviceInfo",
+      "kind": "module",
+      "module": "@ohos.deviceInfo",
+      "title": "@ohos.deviceInfo (设备信息)",
+      "file": "js-apis-device-info.md",
+      "bytes": 22467,
+      "sha256": "84caa2344446d441fe5d94302d081b61343f1ab944deee4a97176373e8a36598",
+      "since": 6,
+      "headingCount": 5,
+      "tags": [
+        "设备信息"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-basic-services-kit/js-apis-device-info.md"
+    },
+    {
+      "id": "http",
+      "kind": "module",
+      "module": "@ohos.net.http",
+      "title": "@ohos.net.http (数据请求)",
+      "file": "js-apis-http.md",
+      "bytes": 150357,
+      "sha256": "e6ad4b8327b1cb20a396489feb71e957448566bd040a018f0d711528be8feb84",
+      "since": 6,
+      "headingCount": 76,
+      "tags": [
+        "网络请求",
+        "http"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-network-kit/js-apis-http.md"
+    },
+    {
+      "id": "webSocket",
+      "kind": "module",
+      "module": "@ohos.net.webSocket",
+      "title": "@ohos.net.webSocket (WebSocket连接)",
+      "file": "js-apis-webSocket.md",
+      "bytes": 65718,
+      "sha256": "ed6209879cbb3cfadf63ca31742ffdf6b64e771c8d2604af80361a1086cb7d6d",
+      "since": 6,
+      "headingCount": 52,
+      "tags": [
+        "websocket",
+        "网络"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-network-kit/js-apis-webSocket.md"
+    },
+    {
+      "id": "preferences",
+      "kind": "module",
+      "module": "@ohos.data.preferences",
+      "title": "@ohos.data.preferences (用户首选项)",
+      "file": "js-apis-data-preferences.md",
+      "bytes": 107691,
+      "sha256": "40cc42d652a2e84fed1b388196916f166244b6753cb645944c050ee9401b4908",
+      "since": 9,
+      "headingCount": 49,
+      "tags": [
+        "键值存储",
+        "持久化"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-arkdata/js-apis-data-preferences.md"
+    },
+    {
+      "id": "emitter",
+      "kind": "module",
+      "module": "@ohos.events.emitter",
+      "title": "@ohos.events.emitter (Emitter)",
+      "file": "js-apis-emitter.md",
+      "bytes": 44064,
+      "sha256": "72cc30ae08f8f37452effe6b8b19a67c222c533e3c69cc7d24ca0a444a1f9c32",
+      "since": 7,
+      "headingCount": 37,
+      "tags": [
+        "事件",
+        "event"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-basic-services-kit/js-apis-emitter.md"
+    },
+    {
+      "id": "process",
+      "kind": "module",
+      "module": "@ohos.process",
+      "title": "@ohos.process (获取进程相关的信息)",
+      "file": "js-apis-process.md",
+      "bytes": 17310,
+      "sha256": "449a75bb1f11e21f5bc3242625949a9267eb6334aad723ed2355ca10d24bf5b4",
+      "since": 7,
+      "headingCount": 24,
+      "tags": [
+        "进程"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-arkts/js-apis-process.md"
+    },
+    {
+      "id": "url",
+      "kind": "module",
+      "module": "@ohos.url",
+      "title": "@ohos.url (URL字符串解析)",
+      "file": "js-apis-url.md",
+      "bytes": 37205,
+      "sha256": "9340a0c25135920f4218604a079ed179d283667a7a52623308aaab3398712e44",
+      "since": 7,
+      "headingCount": 38,
+      "tags": [
+        "url解析"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-arkts/js-apis-url.md"
+    },
+    {
+      "id": "util",
+      "kind": "module",
+      "module": "@ohos.util",
+      "title": "@ohos.util (util工具函数)",
+      "file": "js-apis-util.md",
+      "bytes": 210293,
+      "sha256": "f26344a9590530c5885271991ac5e9d793693c91579b572532f5f36397136f5b",
+      "since": 7,
+      "headingCount": 205,
+      "tags": [
+        "工具",
+        "textencoder",
+        "base64"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-arkts/js-apis-util.md"
+    },
+    {
+      "id": "uiAbility",
+      "kind": "module",
+      "module": "@ohos.app.ability.UIAbility",
+      "title": "@ohos.app.ability.UIAbility (带界面的应用组件)",
+      "file": "js-apis-app-ability-uiAbility.md",
+      "bytes": 60474,
+      "sha256": "cb40908c5b7d2c6d72d5b42c69a2bfaf0f74d1a406d333cbdde91c805efb11ff",
+      "since": 9,
+      "headingCount": 45,
+      "tags": [
+        "应用模型",
+        "ability",
+        "生命周期"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-ability-kit/js-apis-app-ability-uiAbility.md"
+    },
+    {
+      "id": "abilityAccessCtrl",
+      "kind": "module",
+      "module": "@ohos.abilityAccessCtrl",
+      "title": "@ohos.abilityAccessCtrl (程序访问控制管理)",
+      "file": "js-apis-abilityAccessCtrl.md",
+      "bytes": 41151,
+      "sha256": "6e4f9661df5a95584bcaa7f80c4ce7de1c01ef8820466c67aeb174a9c048de32",
+      "since": 8,
+      "headingCount": 24,
+      "tags": [
+        "权限",
+        "permission"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-ability-kit/js-apis-abilityAccessCtrl.md"
+    },
+    {
+      "id": "commonContext",
+      "kind": "module",
+      "module": "@ohos.app.context",
+      "title": "Context (Stage模型的上下文基类)",
+      "file": "js-apis-inner-application-context.md",
+      "bytes": 17641,
+      "sha256": "276dad507f08aac899746c271e10d9f6fc592980e9392996862665c62c52bfa9",
+      "since": 9,
+      "headingCount": 11,
+      "tags": [
+        "context",
+        "上下文"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/reference/apis-ability-kit/js-apis-inner-application-context.md"
+    },
+    {
+      "id": "uiability-lifecycle",
+      "kind": "guide",
+      "module": "",
+      "title": "UIAbility组件生命周期",
+      "file": "uiability-lifecycle.md",
+      "bytes": 14677,
+      "sha256": "5af5e2e260278e00adce64da1176089d38160d301d308b0c8a6d24afee99280a",
+      "since": null,
+      "headingCount": 11,
+      "tags": [
+        "应用模型",
+        "生命周期",
+        "指南"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/application-models/uiability-lifecycle.md"
+    },
+    {
+      "id": "uiability-usage",
+      "kind": "guide",
+      "module": "",
+      "title": "UIAbility组件基本用法",
+      "file": "uiability-usage.md",
+      "bytes": 11211,
+      "sha256": "ad526c867adfeb204690f74a46fee6f9cbf37232a3e8f127a19e0bd08473fdbc",
+      "since": null,
+      "headingCount": 3,
+      "tags": [
+        "应用模型",
+        "入口",
+        "指南"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/application-models/uiability-usage.md"
+    },
+    {
+      "id": "state-management-overview",
+      "kind": "guide",
+      "module": "",
+      "title": "状态管理概述",
+      "file": "arkts-state-management-overview.md",
+      "bytes": 16979,
+      "sha256": "8312c5a08a14456636159030aee4b7aab8c409856e65bf1f4c145d420449d011",
+      "since": null,
+      "headingCount": 9,
+      "tags": [
+        "arkts",
+        "状态管理",
+        "指南"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/ui/state-management/arkts-state-management-overview.md"
+    },
+    {
+      "id": "custom-components",
+      "kind": "guide",
+      "module": "",
+      "title": "创建自定义组件",
+      "file": "arkts-create-custom-components.md",
+      "bytes": 33339,
+      "sha256": "e2625d6b4e5c3ac19fbcbb64b21b6d9b70249483f1ca5cf04d649f1ad16041cc",
+      "since": null,
+      "headingCount": 17,
+      "tags": [
+        "arkts",
+        "自定义组件",
+        "指南"
+      ],
+      "sourceUrl": "https://gitee.com/openharmony/docs/raw/b84779874332bd7c2afee0ca3875494fa4793f1f/zh-cn/application-dev/ui/state-management/arkts-create-custom-components.md"
+    }
+  ]
+}
