@@ -1,7 +1,7 @@
 # dsh-hdc-bridge
 
-> DSH 原生鸿蒙开发助手：`hdc` 设备闭环（看设备 → 截图 → 看图 → 改码 → 装包 → 再看）＋ 官方优先、按 API 版本分类的知识层 ＋ 可选官方 DevEco CLI 构建/签名通道。
-> A DSH-native HarmonyOS dev assistant: the hdc device loop (inspect → screenshot → view → fix → install → verify), an official-first version-classified knowledge layer, and an optional official DevEco CLI build/sign backend.
+> DSH 原生鸿蒙开发助手：`hdc` 设备闭环调试（看设备 → 截图 → 看图 → 改码 → 装包 → 验证）＋ 官方优先版本化知识层（离线 Tier-1 随包 + SDK 机读 + 官方文档检索）＋ 可选官方 DevEco CLI 构建/签名通道。
+> A DSH-native HarmonyOS dev assistant: the hdc device loop (inspect → screenshot → view → fix → install → verify), an official-first version-classified knowledge layer (offline Tier-1 bundled + SDK-accurate reads + official docs search), and an optional official DevEco CLI build/sign backend.
 
 ## 定位
 
