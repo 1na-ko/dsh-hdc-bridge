@@ -25,7 +25,7 @@
       "license": "CC-BY-4.0",
       "copyright": "OpenHarmony documentation (openharmony/docs, © OpenHarmony Project Contributors), CC-BY-4.0 — https://creativecommons.org/licenses/by/4.0/",
       "source": "https://gitee.com/openharmony/docs",
-      "usage": "Verbatim excerpts (no modifications) of the most-used API references and app-model/ArkTS guides, bundled under knowledge/ for offline use (hms_knowledge). Per-file provenance (source commit, sha256, source URL) is recorded in knowledge/index.json; the attribution line is reproduced in lib/knowledge.mjs."
+      "usage": "Unmodified excerpts of the most-used API references and app-model/ArkTS guides, bundled under knowledge/ for offline use (hms_knowledge). Entries marked excerpted retain only selected sections and carry an in-file excerpt note; text is never edited. Per-file provenance (source commit, sha256, kept sections, source URL) is recorded in knowledge/index.json; the attribution line is reproduced in lib/knowledge.mjs."
     }
   ],
   "referenceOnly": [

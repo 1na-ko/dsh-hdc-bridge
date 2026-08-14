@@ -49,6 +49,44 @@ const MANIFEST = [
   { id: 'uiability-usage', kind: 'guide', module: '', path: 'application-models/uiability-usage.md', tags: ['应用模型', '入口', '指南'] },
   { id: 'state-management-overview', kind: 'guide', module: '', path: 'ui/state-management/arkts-state-management-overview.md', tags: ['arkts', '状态管理', '指南'] },
   { id: 'custom-components', kind: 'guide', module: '', path: 'ui/state-management/arkts-create-custom-components.md', tags: ['arkts', '自定义组件', '指南'] },
+  { id: 'uiAbilityContext', kind: 'module', module: '@ohos.app.ability.UIAbilityContext', path: 'reference/apis-ability-kit/js-apis-inner-application-uiAbilityContext.md', tags: ['context', 'ability', '应用上下文'] },
+  { id: 'sensor', kind: 'module', module: '@ohos.sensor', path: 'reference/apis-sensor-service-kit/js-apis-sensor.md', tags: ['传感器', '加速度计', '陀螺仪'], sections: { include: [
+    '导入模块',
+    "=sensor.on('SensorId.ACCELEROMETER')",
+    "=sensor.once('SensorId.ACCELEROMETER')",
+    "=sensor.off('SensorId.ACCELEROMETER')",
+    "=sensor.on('SensorId.GYROSCOPE')",
+    'sensor.getSensorList',
+    'sensor.getSingleSensor',
+    '=Response',
+    '=Options',
+    'SensorId<sup',
+  ] } },
+  { id: 'fileFs', kind: 'module', module: '@ohos.file.fs', path: 'reference/apis-core-file-kit/js-apis-file-fs.md', tags: ['文件', '读写', '目录'], sections: { include: [
+    '导入模块',
+    '使用说明',
+    '=fileIo.stat',
+    '=fileIo.statSync',
+    'fileIo.access',
+    '=fileIo.open',
+    '=fileIo.openSync',
+    '=fileIo.read',
+    '=fileIo.readSync',
+    '=fileIo.write',
+    '=fileIo.writeSync',
+    '=fileIo.close',
+    '=fileIo.closeSync',
+    'fileIo.mkdir',
+    'fileIo.rmdir',
+    'fileIo.unlink',
+    'fileIo.rename',
+    'fileIo.copy',
+    'fileIo.moveFile',
+    'fileIo.listFile',
+    'fileIo.readText',
+    'fileIo.truncate',
+    'fileIo.fsync',
+  ] } },
 ]
 
 async function getJson(url) {
@@ -75,6 +113,41 @@ function countHeadings(text) {
   return m ? m.length : 0
 }
 
+// Section-excerpting for large reference files: keep the module head (title +
+// notes above the first heading) plus every section whose heading matches one
+// matcher, and prepend an excerpt note (CC-BY-4.0 requires indicating
+// modifications; we only trim sections, never edit text).
+function excerptFile(text, matchers, sourceUrl) {
+  const NL = String.fromCharCode(10)
+  const lines = text.split(new RegExp(String.fromCharCode(13) + '?' + String.fromCharCode(10)))
+  const heads = []
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(#{1,3}) (.+)$/.exec(lines[i])
+    if (m) heads.push({ level: m[1].length, text: m[2].trim(), line: i })
+  }
+  const kept = []
+  const keepLines = new Set()
+  const stripSup = (s) => s.replace(/<sup>[^<]*<\/sup>/g, '')
+  for (const h of heads) {
+    if (h.level === 1) continue
+    for (const mat of matchers) {
+      let hit = false
+      if (mat.startsWith('=')) hit = stripSup(h.text) === mat.slice(1)
+      else hit = h.text.includes(mat)
+      if (hit) { kept.push(h.text); keepLines.add(h.line); break }
+    }
+  }
+  const firstHeading = heads.length ? heads[0].line : lines.length
+  const out = lines.slice(0, firstHeading)
+  for (const h of heads) {
+    if (!keepLines.has(h.line)) continue
+    const end = heads.find((x) => x.line > h.line && x.level <= h.level)
+    out.push(...lines.slice(h.line, end ? end.line : lines.length))
+  }
+  const note = '> **节选说明 / Excerpt note**：本文件为官方文档节选（CC-BY-4.0）：仅保留以下小节，未修改任何文字。原文：' + sourceUrl + NL
+  return { text: note + NL + out.join(NL), kept }
+}
+
 export async function main() {
   console.log('[build-knowledge] fetching branch head of ' + REPO + '@' + BRANCH)
   const head = await getJson(API + '/commits?sha=' + BRANCH + '&per_page=1')
@@ -96,23 +169,37 @@ export async function main() {
     const buf = Buffer.from(await res.arrayBuffer())
     const text = buf.toString('utf8')
     if (!text.trim()) throw new Error('empty body for ' + rawUrl)
+    const sourceUrl = RAW + '/' + sourceSha + '/zh-cn/application-dev/' + item.path
+    let finalText = text
+    let keptSections = []
+    if (item.sections && Array.isArray(item.sections.include) && item.sections.include.length) {
+      const ex = excerptFile(text, item.sections.include, sourceUrl)
+      finalText = ex.text
+      keptSections = ex.kept
+    }
+    const outBuf = Buffer.from(finalText, 'utf8')
     const entry = {
       id: item.id,
       kind: item.kind,
       module: item.module,
       title: firstTitle(text) || item.id,
       file: item.path.split('/').pop(),
-      bytes: buf.length,
-      sha256: sha256(buf),
+      bytes: outBuf.length,
+      sha256: sha256(outBuf),
       since: item.kind === 'module' ? firstSince(text) : null,
-      headingCount: countHeadings(text),
+      headingCount: countHeadings(finalText),
       tags: item.tags,
-      sourceUrl: RAW + '/' + sourceSha + '/zh-cn/application-dev/' + item.path,
+      sourceUrl,
+    }
+    if (item.sections) {
+      entry.excerpted = true
+      entry.originalBytes = buf.length
+      entry.keptSections = keptSections
     }
     entries.push(entry)
-    totalBytes += buf.length
-    console.log('[build-knowledge] ' + entry.file + ' ' + entry.bytes + 'B since=API ' + entry.since + ' headings=' + entry.headingCount)
-    writeFileSync(join(OUT_DIR, entry.file), buf)
+    totalBytes += outBuf.length
+    console.log('[build-knowledge] ' + entry.file + ' ' + entry.bytes + 'B' + (entry.excerpted ? ' (excerpt of ' + entry.originalBytes + 'B, ' + keptSections.length + ' sections)' : '') + ' since=API ' + entry.since + ' headings=' + entry.headingCount)
+    writeFileSync(join(OUT_DIR, entry.file), outBuf)
   }
 
   const index = {
@@ -124,7 +211,7 @@ export async function main() {
     language: 'zh-CN',
     license: 'CC-BY-4.0',
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
-    attribution: 'Content excerpted VERBATIM (no modifications) from the OpenHarmony documentation project (openharmony/docs, © OpenHarmony Project Contributors), licensed under CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/).',
+    attribution: 'Content excerpted from the OpenHarmony documentation project (openharmony/docs, © OpenHarmony Project Contributors), licensed under CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/); text is unmodified — entries marked excerpted retain only selected sections, and each carries an in-file excerpt note.',
     generatedAt: new Date().toISOString(),
     totalBytes,
     entries,

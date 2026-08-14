@@ -31,7 +31,7 @@
 | `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警 |
 | `hms_build` | 官方构建/签名/运行通道：status / build / run / sign / clean；devecocli 缺失时自动回退本机 hvigorw + hdc_install + hdc_app 闭环 |
 | `hms_api` | 官方优先的版本化 API 知识：读本机 SDK `.d.ts`（`@since`/`@deprecated`/`@syscap` 精确到 API 版本），按目标版本分类"可用/已废弃/不可用" |
-| `hms_knowledge` | **离线随包官方知识层（Tier-1）**：OpenHarmony 官方文档（CC-BY-4.0）逐字节选 20 个高频 API 模块与应用模型/ArkTS 指南，无需 SDK/CLI/网络。catalog / read（先目录后按小节读）/ search |
+| `hms_knowledge` | **离线随包官方知识层（Tier-1）**：OpenHarmony 官方文档（CC-BY-4.0）未改文字节选 **23 个**高频 API 模块与应用模型/ArkTS 指南（大文件按节选入，文件内附节选声明），无需 SDK/CLI/网络。catalog / read（先目录后按小节读）/ search |
 | `hms_docs` | 官方本地文档检索：`devecocli docs` search / read / catalog（Tier-2：全量文档，需 devecocli） |
 | `hms_api_change` | 官方跨版本破坏性变更扫描：`devecocli check compat`（versions / diff）——回答"知识在哪一版变了" |
 | `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint） |
