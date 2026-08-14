@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check
+        run: |
+          for f in lib/*.mjs lib/*.js scripts/*.mjs; do
+            [ -f "$f" ] && node --check "$f"
+          done
+      - name: License gate
+        run: node scripts/license-check.mjs
+      - name: Pack dry run
+        run: npm pack --dry-run
