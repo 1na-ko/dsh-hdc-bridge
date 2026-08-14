@@ -36,6 +36,7 @@
 | `hms_api_change` | 官方跨版本破坏性变更扫描：`devecocli check compat`（versions / diff）——回答"知识在哪一版变了" |
 | `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint） |
 | 运行时技能 | `hdc-bridge`（设备闭环用法）、`deveco-cli`（官方 SKILL.md 改写，MIT 声明保留）、`harmonyos-knowledge`（知识层纪律：官方优先、版本化、许可合规），模型按需加载 |
+| 设备记忆 | 工具默认使用**本会话上次使用的设备**（显式 target 或面板点选设备即切换默认；掉线自动回退首台连接设备）；`hdc_list_targets` 暴露 `preferred/preferredActive` 字段 |
 | 设备面板 | v0.6：web 宿主右上角浮动面板——已连接设备（型号/API 版本）、一键截图缩略、hilog 尾部、连接指引；数据走 `/api2/hdc-bridge/*` 只读 REST（8s 轮询 + 手动刷新），headless 宿主自动跳过 |
 | 可选知识搭配 | Tier-2 社区包 [harmony-next.skills](https://github.com/linhay/harmony-next.skills)（无 LICENSE，不随包，用户自行 `npx skills add linhay/harmony-next.skills`） |
 
