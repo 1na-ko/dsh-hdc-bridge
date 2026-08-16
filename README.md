@@ -10,6 +10,7 @@
 - 会话内工具卡片与 `read_image` 原生闭环
 - 按调用会话解析沙箱策略（与 `pwsh` 工具同款路线），截图写入 `<workspace>/.dsh-hdc/screenshots/`
 - 结构化的失败上报（hdc 传输层退出码不可靠，插件用输出标记 + 落盘校验兜底）
+- v0.7 起面板按官方 client 插件形态集成（边栏入口 + 浮动面板 + 官方主题），新增 `hms_emulator` 模拟器控制，Tier-1 离线知识层 28 篇
 
 ## 工具
 
@@ -29,7 +30,7 @@
 | `hdc_app` | 应用管理：query / start / stop / clear-data / uninstall（破坏性动作已标注） |
 | `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤，并解析结构化摘要（错误名/信息/错误码/源码帧/已知错误码提示） |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
-| 错误码提示 | install / app 失败时按错误码附中文修复建议（如 9568332 → 登记设备 UDID） |
+| 错误码提示 | install / app / build 失败按 11 条已知错误码附中文修复建议（9568332 签名未绑 UDID→AGC 登记设备、9568289/9568322 签名配置、1300002 空间不足…）；签名类错误附三类修复（AGC 证书配置 / 重装自签名 / 换 debug 签名）+ 直达 AGC 链接 |
 | `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警 |
 | `hms_build` | 官方构建/签名/运行通道：status / build / run / sign / clean；devecocli 缺失时自动回退本机 hvigorw + hdc_install + hdc_app 闭环 |
 | `hms_api` | 官方优先的版本化 API 知识：读本机 SDK `.d.ts`（`@since`/`@deprecated`/`@syscap` 精确到 API 版本），按目标版本分类"可用/已废弃/不可用" |
@@ -37,9 +38,10 @@
 | `hms_docs` | 官方本地文档检索：`devecocli docs` search / read / catalog（Tier-2：全量文档，需 devecocli） |
 | `hms_api_change` | 官方跨版本破坏性变更扫描：`devecocli check compat`（versions / diff）——回答"知识在哪一版变了" |
 | `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint） |
+| `hms_emulator` | 官方模拟器控制（devecocli emulator）：list / start / stop / create / delete + 状态注入 shake / power / rotate / volume / fold / battery / geolocation / sensor / scene；未装 CLI 时按官方 SKILL.md 指路安装（第 20 个工具） |
 | 运行时技能 | `hdc-bridge`（设备闭环用法）、`deveco-cli`（官方 SKILL.md 改写，MIT 声明保留）、`harmonyos-knowledge`（知识层纪律：官方优先、版本化、许可合规），模型按需加载 |
 | 设备记忆 | 工具默认使用**本会话上次使用的设备**（显式 target 或面板点选设备即切换默认；掉线自动回退首台连接设备）；`hdc_list_targets` 暴露 `preferred/preferredActive` 字段 |
-| 设备面板 | **官方 client 插件形态**（对齐平台 cordis 面板与社区远程控制插件的做法）：入口为左侧边栏底部（`sidebar.footer.action` 槽位）的图标按钮——折叠 rail 态仅图标+状态点，展开态带「鸿蒙」标签与设备数徽标；点击经 ReactDOM portal 弹出居中模态面板（mask + 卡片，官方 `--dsw-alias-*` token、`data-plugin-css` 注入、随平台生命周期卸载）——设备列表（型号/API/电池）、一键截图、hilog 尾部、系统区、工具链徽章；面板打开 8s/20s 轮询、关闭降为 60s 慢轮询（入口状态点保持新鲜）；拖拽/缩放布局持久化；数据走 `/api2/hdc-bridge/*` 只读 REST；headless 宿主自动跳过 |
+| 设备面板 | **官方 client 插件形态**（对齐平台 cordis 面板与社区远程控制插件）：入口挂左侧边栏 `sidebar.footer.action` 槽位——折叠 rail 态 36px 圆钮 + 状态点 + 数量角标（多条目自动竖排成图标列），展开态「鸿蒙」标签 + 设备数按官方间距紧贴前序按钮；点击经 ReactDOM portal 打开**右上角浮动面板**（拖拽 / 八向缩放 / 收起 / 归位 / × 关闭，不打断主界面）——设备列表（型号/API/电池）、一键截图、hilog 尾部、系统区、工具链徽章；主题走官方 `--dsw-alias-*` token、样式按官方 `data-plugin-css` 约定注入、层级对齐官方弹层，随平台生命周期卸载；面板打开 8s/20s、关闭降为 60s 慢轮询（入口状态点保持新鲜）；数据走 `/api2/hdc-bridge/*` 只读 REST；headless 宿主自动跳过 |
 | 可选知识搭配 | Tier-2 社区包 [harmony-next.skills](https://github.com/linhay/harmony-next.skills)（无 LICENSE，不随包，用户自行 `npx skills add linhay/harmony-next.skills`） |
 
 ## 安装 / Installation
@@ -63,7 +65,7 @@ dsh --profile <name>
 - 截图查看需图像输入模型；纯文本模型可用 `hdc_ui_dump` 做文本化 UI 检查
 - 可选后端 `@deveco/deveco-cli`（MIT）随插件作为 optionalDependency 自动安装（pnpm 失败容忍）；构建/签名/lint 的 `--format json` 能力需本机 DevEco Studio ≥ 6.1.0（macOS/Windows，Node ≥ 18）。签名前需一次人工 `devecocli auth login`（浏览器 OAuth）
 - `hms_api` / `hms_lint rules` 直接读本机 DevEco Studio/SDK 安装（零再分发）；未装 Studio 时这两项降级并给出指引
-- `hms_knowledge` 的 Tier-1 官方知识节选随包内置（约 1.2MB，CC-BY-4.0 逐字节选并附署名），**离线可用**，无需任何本机安装
+- `hms_knowledge` 的 Tier-1 官方知识节选随包内置（28 篇约 1.7MB，CC-BY-4.0 逐字节选并附署名 + 逐文件溯源），**离线可用**，无需任何本机安装
 - `hms_api_change`（check compat）需要更高版本的 DevEco Studio（实测 6.1.0.830 报"min required 26.0.0.810"）；不满足时工具返回官方错误原文 + 升级指引，并提示先用 `hms_api` 的 `@since/@deprecated` 版本知识
 
 ## 依赖与许可合规
@@ -93,6 +95,8 @@ dsh --profile <name>
 | v0.2 应用生命周期 | stop → clear-data → uninstall → install → start 全链路 ✓（模拟器实测） |
 | v0.2 崩溃抓取 | jscrash 按包名过滤返回源码级堆栈 ✓（模拟器）；无崩溃时优雅返回 ✓（真机） |
 | v0.2 实机登录流程 | 拉起 → dump 定位 → 分段输入 → 校验 → 点登录、请求发出 ✓（真机实测） |
+| v0.7 面板三态（无头 Edge 实测） | 展开态入口贴排（6px 官方间距）、折叠态四行图标列、往返切换、浮动面板截图即时出图、层级正确 ✓ |
+| v0.7 模拟器全量 | 20 工具 + 4 REST 路由 + 知识层 28 篇读取 + `hms_emulator` 降级指路 ✓（发布前回归） |
 
 ## 已知限制 / Known limitations
 
@@ -106,12 +110,12 @@ dsh --profile <name>
 
 ## 路线图
 
-- [x] 会话头部设备面板（v0.6：web 宿主浮动面板 + 挂载 toast，/api2 REST 数据通道；Typert Remote 推送升级留待后续）
 - [x] DevEco CLI（devecocli）构建/签名封装（v0.4：可选后端 + hvigorw 降级）
 - [x] 官方优先版本化知识层（v0.4：SDK .d.ts + 官方文档检索 + 跨版本变更扫描 + 官方 lint 规则）
-- [x] 深度优化（v0.7：全量回归 smoke 入 CI、hdc-core/errors 拆分与错误码表扩容、hms_build 工作区预检、面板布局持久化/轮询退避、`hms_emulator` 官方模拟器控制、签名错误指引、Tier-1 扩至 28 篇含 window/Window 与 Navigation）
-- [ ] macOS 实机验证
 - [x] 按 API 版本整理的官方知识节选随包内置（v0.5：`hms_knowledge`，20 个高频主题逐字节选，CC-BY-4.0 合规）
+- [x] 会话头部设备面板（v0.6：web 宿主浮动面板 + /api2 REST 数据通道）
+- [x] 深度优化 + 面板官方化（v0.7：全量回归 smoke 入 CI、hdc-core/errors 拆分与 11 条错误码、hms_build 工作区预检、`hms_emulator` 模拟器控制、签名三类指引、Tier-1 扩至 28 篇；面板按官方 client 插件形态重做——边栏入口 + portal 浮动面板 + 官方主题 token + 无头浏览器逐态实测）
+- [ ] macOS 实机验证
 
 ## License
 
