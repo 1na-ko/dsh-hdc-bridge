@@ -39,7 +39,7 @@
 | `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint） |
 | 运行时技能 | `hdc-bridge`（设备闭环用法）、`deveco-cli`（官方 SKILL.md 改写，MIT 声明保留）、`harmonyos-knowledge`（知识层纪律：官方优先、版本化、许可合规），模型按需加载 |
 | 设备记忆 | 工具默认使用**本会话上次使用的设备**（显式 target 或面板点选设备即切换默认；掉线自动回退首台连接设备）；`hdc_list_targets` 暴露 `preferred/preferredActive` 字段 |
-| 设备面板 | **官方 client 插件形态**：React 组件注册进平台 `shell.overlay` 槽位（全局浮动层），主题走官方 `--dsw-alias-*` token、样式按官方 `data-plugin-css` 约定注入，无野 DOM、随平台生命周期卸载——已连接设备（型号/API 版本）、一键截图缩略、hilog 尾部、连接指引；数据走 `/api2/hdc-bridge/*` 只读 REST。左下角「鸿蒙」FAB 开关：面板默认收起不打扰，可见性/布局/缩放持久化，隐藏时降为 60s 慢轮询（FAB 状态点 + 设备数徽标保持新鲜），headless 宿主自动跳过 |
+| 设备面板 | **官方 client 插件形态**（对齐平台 cordis 面板与社区远程控制插件的做法）：入口为左侧边栏底部（`sidebar.footer.action` 槽位）的图标按钮——折叠 rail 态仅图标+状态点，展开态带「鸿蒙」标签与设备数徽标；点击经 ReactDOM portal 弹出居中模态面板（mask + 卡片，官方 `--dsw-alias-*` token、`data-plugin-css` 注入、随平台生命周期卸载）——设备列表（型号/API/电池）、一键截图、hilog 尾部、系统区、工具链徽章；面板打开 8s/20s 轮询、关闭降为 60s 慢轮询（入口状态点保持新鲜）；拖拽/缩放布局持久化；数据走 `/api2/hdc-bridge/*` 只读 REST；headless 宿主自动跳过 |
 | 可选知识搭配 | Tier-2 社区包 [harmony-next.skills](https://github.com/linhay/harmony-next.skills)（无 LICENSE，不随包，用户自行 `npx skills add linhay/harmony-next.skills`） |
 
 ## 安装 / Installation

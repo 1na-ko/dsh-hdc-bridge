@@ -101,8 +101,8 @@ check('search-hilog', sw.results.some((x) => x.id === 'hilog'), JSON.stringify(s
 // executes the real bundle, and these guards pin the official wiring.
 const clientSrc = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
 check('client-loader-factory', /window\.__ModuleLoader__\.load\(/.test(clientSrc) && /exports\.apply/.test(clientSrc))
-check('client-react-module', /require\('react'\)/.test(clientSrc))
-check('client-slot-registration', /ctx\.slots\.inject\('shell\.overlay'/.test(clientSrc) && /ctx\.slots\.register\(/.test(clientSrc))
+check('client-react-module', /require\('react'\)/.test(clientSrc) && /require\('react-dom'\)/.test(clientSrc))
+check('client-slot-registration', /ctx\.slots\.inject\('sidebar\.footer\.action'/.test(clientSrc) && /ctx\.slots\.register\(/.test(clientSrc))
 check('client-official-css-injection', /data-plugin-css/.test(clientSrc) && /--dsw-alias-/.test(clientSrc))
 
 // ---------- 5. hms_emulator degradation (no devecocli in fake ctx) ----------
@@ -151,11 +151,13 @@ function makeFakeReact() {
     },
     createElement(type, props) {
       const children = Array.prototype.slice.call(arguments, 2)
+      if (type === '@frag') return { type: '@frag', props: props || {}, children }
       if (typeof type === 'function') {
         return type(Object.assign({}, props || {}, { children: children.length ? children : undefined }))
       }
       return { type, props: props || {}, children }
     },
+    Fragment: '@frag',
   }
 }
 const g0 = globalThis
@@ -175,7 +177,8 @@ g0.localStorage = { m: {}, getItem(k) { return k in this.m ? this.m[k] : null },
 const clientMod = await import(new URL('../lib/client.js', import.meta.url).href + '?t=' + Date.now())
 check('client-loader-captured', !!loaderCapture && loaderCapture.id === 'dsh-hdc-bridge')
 const fakeReact = makeFakeReact()
-const cmod = loaderCapture && loaderCapture.factory((spec) => { if (spec === 'react') return fakeReact; throw new Error('unexpected require: ' + spec) })
+const fakeReactDom = { createPortal: (el) => el }
+const cmod = loaderCapture && loaderCapture.factory((spec) => { if (spec === 'react') return fakeReact; if (spec === 'react-dom') return fakeReactDom; throw new Error('unexpected require: ' + spec) })
 check('client-exports-apply', !!cmod && typeof cmod.apply === 'function' && Array.isArray(cmod.inject) && cmod.inject.includes('slots'), cmod && JSON.stringify(cmod.inject))
 const slotCalls = { inject: [], register: [] }
 let applyThrew = null
@@ -190,9 +193,9 @@ if (cmod) {
   } catch (e) { applyThrew = e }
 }
 check('client-apply-no-throw', !applyThrew, String(applyThrew && applyThrew.message))
-check('client-slots-shell-overlay', slotCalls.inject.length === 1 && slotCalls.inject[0] === 'shell.overlay', JSON.stringify(slotCalls.inject))
+check('client-slots-footer-action', slotCalls.inject.length === 1 && slotCalls.inject[0] === 'sidebar.footer.action', JSON.stringify(slotCalls.inject))
 const regEntry = slotCalls.register[0]
-check('client-register-shape', !!regEntry && regEntry.name === 'shell.overlay' && regEntry.opts && regEntry.opts.id === 'hdc-bridge' && typeof regEntry.opts.order === 'number' && typeof regEntry.comp === 'function', JSON.stringify(regEntry && { name: regEntry.name, opts: regEntry.opts }))
+check('client-register-shape', !!regEntry && regEntry.name === 'sidebar.footer.action' && regEntry.opts && regEntry.opts.id === 'hdc-bridge' && typeof regEntry.opts.order === 'number' && typeof regEntry.comp === 'function', JSON.stringify(regEntry && { name: regEntry.name, opts: regEntry.opts }))
 function findNode(node, pred, out) {
   out = out || []
   if (!node || typeof node !== 'object') return out
@@ -204,15 +207,16 @@ function findNode(node, pred, out) {
 }
 if (regEntry && regEntry.comp) {
   fakeReact.__reset()
-  const tree1 = regEntry.comp()
-  const fab1 = findNode(tree1, (n) => n.type === 'button' && (n.props.className || '').indexOf('hdcp-fab') >= 0)
-  const root1 = findNode(tree1, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-root') >= 0)
-  check('client-fab-rendered-hidden', fab1.length === 1 && (fab1[0].props.className || '').indexOf('hdcp-fab-on') < 0 && root1.length === 0, JSON.stringify({ fabs: fab1.length, roots: root1.length }))
-  fab1[0].props.onClick()
+  const tree1 = regEntry.comp({ wide: true })
+  const btn1 = findNode(tree1, (n) => n.type === 'button' && (n.props.className || '').indexOf('hdcp-entry') >= 0)
+  const overlay1 = findNode(tree1, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-overlay') >= 0)
+  check('client-entry-hidden-by-default', btn1.length === 1 && overlay1.length === 0, JSON.stringify({ btns: btn1.length, overlays: overlay1.length }))
+  btn1[0].props.onClick()
   fakeReact.__reset()
-  const tree2 = regEntry.comp()
+  const tree2 = regEntry.comp({ wide: true })
+  const overlay2 = findNode(tree2, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-overlay') >= 0)
   const root2 = findNode(tree2, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-root') >= 0)
-  check('client-fab-toggle-shows', root2.length === 1, JSON.stringify({ roots: root2.length }))
+  check('client-entry-toggle-shows-modal', overlay2.length === 1 && root2.length === 1, JSON.stringify({ overlays: overlay2.length, roots: root2.length }))
 }
 g0.document = savedG.document
 g0.localStorage = savedG.localStorage
