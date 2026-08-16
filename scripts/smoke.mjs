@@ -44,7 +44,7 @@ const exec = { agent: { session: undefined } }
 const lastTarget = () => { const m = [...seen].reverse().find((c) => c.includes('-t')); return m ? (m.match(/-t '([^']+)'/) || [])[1] : '' }
 
 // ---------- 1. registration ----------
-check('tools=19', registered.length === 19, 'got ' + registered.length)
+check('tools=20', registered.length === 20, 'got ' + registered.length)
 check('skills=3', skills.length === 3, 'got ' + skills.length)
 check('routes=4', routes.length === 4, routes.map((r) => r.path).join(','))
 
