@@ -216,7 +216,7 @@ if (regEntry && regEntry.comp) {
   const tree2 = regEntry.comp({ wide: true })
   const overlay2 = findNode(tree2, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-overlay') >= 0)
   const root2 = findNode(tree2, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-root') >= 0)
-  check('client-entry-toggle-shows-modal', overlay2.length === 1 && root2.length === 1, JSON.stringify({ overlays: overlay2.length, roots: root2.length }))
+  check('client-entry-toggle-shows-panel', overlay2.length === 0 && root2.length === 1, JSON.stringify({ overlays: overlay2.length, roots: root2.length }))
 }
 g0.document = savedG.document
 g0.localStorage = savedG.localStorage
