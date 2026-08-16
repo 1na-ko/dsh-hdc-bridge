@@ -107,6 +107,7 @@ dsh --profile <name>
 - [x] 会话头部设备面板（v0.6：web 宿主浮动面板 + 挂载 toast，/api2 REST 数据通道；Typert Remote 推送升级留待后续）
 - [x] DevEco CLI（devecocli）构建/签名封装（v0.4：可选后端 + hvigorw 降级）
 - [x] 官方优先版本化知识层（v0.4：SDK .d.ts + 官方文档检索 + 跨版本变更扫描 + 官方 lint 规则）
+- [x] 深度优化（v0.7：全量回归 smoke 入 CI、hdc-core/errors 拆分与错误码表扩容、hms_build 工作区预检、面板布局持久化/轮询退避、`hms_emulator` 官方模拟器控制、签名错误指引、Tier-1 扩至 28 篇含 window/Window 与 Navigation）
 - [ ] macOS 实机验证
 - [x] 按 API 版本整理的官方知识节选随包内置（v0.5：`hms_knowledge`，20 个高频主题逐字节选，CC-BY-4.0 合规）
 
