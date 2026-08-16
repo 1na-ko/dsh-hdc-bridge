@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Regression smoke
+        run: node scripts/smoke.mjs
       - name: Syntax check
         run: |
           for f in lib/*.mjs lib/*.js scripts/*.mjs; do
