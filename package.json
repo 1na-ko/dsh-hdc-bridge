@@ -1,6 +1,6 @@
 {
   "name": "dsh-hdc-bridge",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "DSH-native HarmonyOS dev-assistant plugin: hdc device bridge with a live device panel, official-first versioned API docs (SDK .d.ts + offline bundled Tier-1 knowledge), and an optional DevEco CLI backend for build/sign/lint.",
   "author": "inako",
   "repository": {
