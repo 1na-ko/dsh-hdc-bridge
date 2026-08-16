@@ -47,6 +47,7 @@ const lastTarget = () => { const m = [...seen].reverse().find((c) => c.includes(
 // ---------- 1. registration ----------
 check('tools=20', registered.length === 20, 'got ' + registered.length)
 check('skills=3', skills.length === 3, 'got ' + skills.length)
+check('skills-source-runtime', skills.every((s) => s.source === 'runtime'), JSON.stringify(skills.map((s) => s.name + ':' + s.source)))
 check('routes=4', routes.length === 4, routes.map((r) => r.path).join(','))
 
 // ---------- 2. device memory ----------
