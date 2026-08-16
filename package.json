@@ -10,8 +10,12 @@
   "type": "module",
   "main": "lib/host.js",
   "exports": {
-    ".": { "default": "./lib/host.js" },
-    "./client": { "default": "./lib/client.js" },
+    ".": {
+      "default": "./lib/host.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -50,5 +54,8 @@
     "plugin",
     "agent"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
 }
