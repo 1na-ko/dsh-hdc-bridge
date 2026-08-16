@@ -92,6 +92,19 @@ if (emu) {
   console.log('SKIP [emulator-tool-registered] 未实现')
 }
 
+// ---------- 6. hms_build workspace boundary precheck ----------
+const reg2 = []
+mod.apply({
+  get(n) { if (n === 'sandboxPolicy') return { resolve: () => ({ mode: 'workspace-write', workspaceRoot: 'F:/session-ws' }) }; return undefined },
+  inject() {},
+  shell: fakeShell(),
+  tools: { register: (d) => reg2.push(d) },
+  effect: (fn) => fn(),
+})
+const build2 = reg2.find((t) => t.name === 'hms_build')
+const br = await build2.execute({ action: 'build', projectPath: 'F:/other/proj' }, exec)
+check('build-boundary', br.ok === false && br.outsideWorkspace === true && /工作区之外/.test(br.error || ''), JSON.stringify({ ok: br.ok, outside: br.outsideWorkspace }))
+
 // ---------- summary ----------
 console.log('')
 console.log(failures === 0 ? 'SMOKE ALL PASS' : 'SMOKE FAILURES: ' + failures)
