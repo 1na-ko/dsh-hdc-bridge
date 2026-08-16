@@ -93,15 +93,17 @@ check('read-navigation-api', nv.ok === true && /Navigation/.test(nv.content || '
 const sw = await kn.execute({ action: 'search', keywords: '日志' }, exec)
 check('search-hilog', sw.results.some((x) => x.id === 'hilog'), JSON.stringify(sw.results.slice(0, 3).map((x) => x.id)))
 
-// ---------- 4b. client bundle guards (browser half) ----------
-// Regression for v0.7.0: poll() dropped its 'return', so the loader entry
-// failed with `Cannot read properties of undefined (reading 'then')` and the
-// web UI showed the 'Failed to load plugins' banner. Pin both ends of the chain.
+// ---------- 4b. client bundle guards (official client-plugin contract) ----------
+// The browser half must follow the platform client-plugin shape: React from the
+// seed table, a surface registered into the declared 'shell.overlay' slot, and
+// the official data-plugin-css style injection. Regression note: v0.7.0's
+// poll() dropped its 'return' and broke the loader entry — the replay below
+// executes the real bundle, and these guards pin the official wiring.
 const clientSrc = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
-const pollBody = /function poll\(\)\s*\{([\s\S]*?)\n        \}/.exec(clientSrc)
-check('client-poll-returns', !!pollBody && pollBody[1].includes('return fetch'), pollBody ? 'poll body has no return fetch' : 'poll not found')
-check('client-poll-then-schedule', /\.then\(schedule\)/.test(clientSrc))
 check('client-loader-factory', /window\.__ModuleLoader__\.load\(/.test(clientSrc) && /exports\.apply/.test(clientSrc))
+check('client-react-module', /require\('react'\)/.test(clientSrc))
+check('client-slot-registration', /ctx\.slots\.inject\('shell\.overlay'/.test(clientSrc) && /ctx\.slots\.register\(/.test(clientSrc))
+check('client-official-css-injection', /data-plugin-css/.test(clientSrc) && /--dsw-alias-/.test(clientSrc))
 
 // ---------- 5. hms_emulator degradation (no devecocli in fake ctx) ----------
 const emu = registered.find((t) => t.name === 'hms_emulator')
@@ -125,66 +127,96 @@ const build2 = reg2.find((t) => t.name === 'hms_build')
 const br = await build2.execute({ action: 'build', projectPath: 'F:/other/proj' }, exec)
 check('build-boundary', br.ok === false && br.outsideWorkspace === true && /工作区之外/.test(br.error || ''), JSON.stringify({ ok: br.ok, outside: br.outsideWorkspace }))
 
-// ---------- 7. client bundle replay (stubbed DOM, real mount + poll) ----------
-// Executes the actual browser bundle in Node with a permissive DOM stub so the
-// whole apply/mount/poll/render path runs — the class of bug that broke the
-// loader entry in v0.7.0 (undefined.then) is caught here, not by a static grep.
-function makeEl(id) {
-  const listeners = {}
-  const el = {
-    id: id || '', children: [], listeners,
-    style: {}, classList: { add() {}, remove() {} }, dataset: {},
-    textContent: '', innerHTML: '', type: '', title: '', src: '', disabled: false,
-    offsetLeft: 0, offsetTop: 0, offsetWidth: 330, offsetHeight: 400,
-    parentNode: null,
+// ---------- 7. client bundle replay (official slots contract) ----------
+// Executes the real browser bundle in Node: apply() runs against a fake slots
+// service (capturing the shell.overlay registration), then the registered
+// React component is shallow-rendered with a minimal hook runtime — FAB
+// present, panel hidden by default, toggle reveals it. This catches the class
+// of bug that broke the loader entry in v0.7.0 (undefined.then), end to end.
+function makeFakeReact() {
+  const hooks = []
+  let hIdx = 0
+  return {
+    __reset() { hIdx = 0 },
+    useState(init) {
+      const i = hIdx++
+      if (!(i in hooks)) hooks[i] = typeof init === 'function' ? init() : init
+      return [hooks[i], (v) => { hooks[i] = typeof v === 'function' ? v(hooks[i]) : v }]
+    },
+    useEffect() { hIdx++ },
+    useRef(init) {
+      const i = hIdx++
+      if (!(i in hooks)) hooks[i] = { current: init }
+      return hooks[i]
+    },
+    createElement(type, props) {
+      const children = Array.prototype.slice.call(arguments, 2)
+      if (typeof type === 'function') {
+        return type(Object.assign({}, props || {}, { children: children.length ? children : undefined }))
+      }
+      return { type, props: props || {}, children }
+    },
   }
-  let cls = ''
-  Object.defineProperty(el, 'className', { get: () => cls, set: (v) => { cls = v } })
-  el.addEventListener = (n, f) => { (listeners[n] = listeners[n] || []).push(f) }
-  el.appendChild = (c) => { el.children.push(c); c.parentNode = el; return c }
-  el.removeChild = (c) => { const i = el.children.indexOf(c); if (i >= 0) el.children.splice(i, 1); c.parentNode = null; return c }
-  el.querySelector = (sel) => makeEl(sel)
-  el.querySelectorAll = () => [makeEl('x'), makeEl('x')]
-  el.setAttribute = () => {}
-  el.getAttribute = (n) => (n === 'data-dir' ? 'se' : null)
-  el.setPointerCapture = () => {}
-  el.closest = () => null
-  return el
 }
 const g0 = globalThis
-const savedG = { setInterval: g0.setInterval, clearInterval: g0.clearInterval, setTimeout: g0.setTimeout, clearTimeout: g0.clearTimeout, fetch: g0.fetch, window: g0.window, document: g0.document, localStorage: g0.localStorage, requestAnimationFrame: g0.requestAnimationFrame }
+const savedG = { document: g0.document, localStorage: g0.localStorage, window: g0.window }
 let loaderCapture = null
-g0.setInterval = () => 0
-g0.clearInterval = () => {}
-g0.setTimeout = () => 0
-g0.clearTimeout = () => {}
-g0.fetch = async () => ({
-  ok: true, status: 200,
-  json: async () => ({ ok: true, hdc: 'hdc.exe', version: '0.7.0', toolchain: { studio: '6.1.1.290', sdk: 24, devecocli: false, knowledge: 28 }, devices: [{ id: '127.0.0.1:5555', type: 'TCP', state: 'Connected', model: 'emulator', name: 'emulator', apiVersion: 23, battery: { capacity: 100, temperature: 25, charging: false } }], system: { mem: { totalMB: 3931, availMB: 2654 }, storage: { size: '5.7G', used: '1.3G', usePct: '25%' }, display: { w: 1256, h: 2760 } }, screenshot: { available: false }, hilog: { available: true, lines: ['I 00000/HiLog: smoke line'] }, preferred: '127.0.0.1:5555', error: '', lastError: '', updatedAt: Date.now() }),
-})
 g0.window = {
   __ModuleLoader__: { load: (spec) => { loaderCapture = spec } },
   innerWidth: 1280, innerHeight: 800,
+  addEventListener() {}, removeEventListener() {},
 }
-g0.document = { body: makeEl('body'), head: makeEl('head'), getElementById: (id) => (id === 'hdc-panel-style' ? null : makeEl(id)), createElement: (tag) => makeEl(tag) }
+g0.document = {
+  querySelector: () => null,
+  createElement: () => ({ setAttribute() {}, textContent: '' }),
+  head: { appendChild() {} },
+}
 g0.localStorage = { m: {}, getItem(k) { return k in this.m ? this.m[k] : null }, setItem(k, v) { this.m[k] = String(v) }, removeItem(k) { delete this.m[k] } }
-g0.requestAnimationFrame = (f) => { f(); return 0 }
 const clientMod = await import(new URL('../lib/client.js', import.meta.url).href + '?t=' + Date.now())
 check('client-loader-captured', !!loaderCapture && loaderCapture.id === 'dsh-hdc-bridge')
-const cmod = loaderCapture && loaderCapture.factory(() => {})
-check('client-exports-apply', !!cmod && typeof cmod.apply === 'function')
+const fakeReact = makeFakeReact()
+const cmod = loaderCapture && loaderCapture.factory((spec) => { if (spec === 'react') return fakeReact; throw new Error('unexpected require: ' + spec) })
+check('client-exports-apply', !!cmod && typeof cmod.apply === 'function' && Array.isArray(cmod.inject) && cmod.inject.includes('slots'), cmod && JSON.stringify(cmod.inject))
+const slotCalls = { inject: [], register: [] }
 let applyThrew = null
-if (cmod) cmod.apply({ effect: (fn) => { try { fn() } catch (e) { applyThrew = e } } })
-await new Promise((r) => setImmediate(r))
+if (cmod) {
+  try {
+    cmod.apply({
+      slots: {
+        inject: (name, cb) => { slotCalls.inject.push(name); const d = cb(); slotCalls.register.push(d); return () => {} },
+        register: (opts, comp) => ({ name: opts && opts.name, opts, comp, dispose: () => {} }),
+      },
+    })
+  } catch (e) { applyThrew = e }
+}
 check('client-apply-no-throw', !applyThrew, String(applyThrew && applyThrew.message))
-const bodyKids = g0.document.body.children
-const fabEl = bodyKids.find((x) => x.id === 'hdcp-fab')
-const rootEl = bodyKids.find((x) => x.id === 'hdc-panel-root')
-check('client-fab-mounted', !!fabEl, JSON.stringify(bodyKids.map((x) => x.id)))
-check('client-panel-default-hidden', !!rootEl && rootEl.style.display === 'none', rootEl && rootEl.style.display)
-if (fabEl && fabEl.listeners.click && fabEl.listeners.click[0]) fabEl.listeners.click[0]()
-check('client-fab-toggle-shows', !!rootEl && rootEl.style.display === '', rootEl && rootEl.style.display)
-for (const k of Object.keys(savedG)) { if (savedG[k] !== undefined) g0[k] = savedG[k] }
+check('client-slots-shell-overlay', slotCalls.inject.length === 1 && slotCalls.inject[0] === 'shell.overlay', JSON.stringify(slotCalls.inject))
+const regEntry = slotCalls.register[0]
+check('client-register-shape', !!regEntry && regEntry.name === 'shell.overlay' && regEntry.opts && regEntry.opts.id === 'hdc-bridge' && typeof regEntry.opts.order === 'number' && typeof regEntry.comp === 'function', JSON.stringify(regEntry && { name: regEntry.name, opts: regEntry.opts }))
+function findNode(node, pred, out) {
+  out = out || []
+  if (!node || typeof node !== 'object') return out
+  if (pred(node)) out.push(node)
+  const kids = node.children || (node.props && node.props.children)
+  if (Array.isArray(kids)) for (const k of kids) findNode(k, pred, out)
+  else if (kids && typeof kids === 'object') findNode(kids, pred, out)
+  return out
+}
+if (regEntry && regEntry.comp) {
+  fakeReact.__reset()
+  const tree1 = regEntry.comp()
+  const fab1 = findNode(tree1, (n) => n.type === 'button' && (n.props.className || '').indexOf('hdcp-fab') >= 0)
+  const root1 = findNode(tree1, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-root') >= 0)
+  check('client-fab-rendered-hidden', fab1.length === 1 && (fab1[0].props.className || '').indexOf('hdcp-fab-on') < 0 && root1.length === 0, JSON.stringify({ fabs: fab1.length, roots: root1.length }))
+  fab1[0].props.onClick()
+  fakeReact.__reset()
+  const tree2 = regEntry.comp()
+  const root2 = findNode(tree2, (n) => n.type === 'div' && (n.props.className || '').indexOf('hdcp-root') >= 0)
+  check('client-fab-toggle-shows', root2.length === 1, JSON.stringify({ roots: root2.length }))
+}
+g0.document = savedG.document
+g0.localStorage = savedG.localStorage
+g0.window = savedG.window
 
 // ---------- summary ----------
 console.log('')
