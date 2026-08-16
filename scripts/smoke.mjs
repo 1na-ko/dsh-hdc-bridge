@@ -2,6 +2,7 @@
 // everything except panel.mjs, whose direct hdc spawn is exercised only for
 // its graceful-degradation paths). Run: node scripts/smoke.mjs
 const MOD_URL = new URL('../lib/host.js', import.meta.url).href
+import { readFile } from 'node:fs/promises'
 let failures = 0
 function check(name, cond, extra) {
   console.log((cond ? 'PASS' : 'FAIL') + ' [' + name + ']' + (cond || extra === undefined ? '' : ' ' + extra))
@@ -90,6 +91,16 @@ const nv = await kn.execute({ action: 'read', id: 'Navigation', section: '接口
 check('read-navigation-api', nv.ok === true && /Navigation/.test(nv.content || ''))
 const sw = await kn.execute({ action: 'search', keywords: '日志' }, exec)
 check('search-hilog', sw.results.some((x) => x.id === 'hilog'), JSON.stringify(sw.results.slice(0, 3).map((x) => x.id)))
+
+// ---------- 4b. client bundle guards (browser half) ----------
+// Regression for v0.7.0: poll() dropped its 'return', so the loader entry
+// failed with `Cannot read properties of undefined (reading 'then')` and the
+// web UI showed the 'Failed to load plugins' banner. Pin both ends of the chain.
+const clientSrc = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
+const pollBody = /function poll\(\)\s*\{([\s\S]*?)\n        \}/.exec(clientSrc)
+check('client-poll-returns', !!pollBody && pollBody[1].includes('return fetch'), pollBody ? 'poll body has no return fetch' : 'poll not found')
+check('client-poll-then-schedule', /\.then\(schedule\)/.test(clientSrc))
+check('client-loader-factory', /window\.__ModuleLoader__\.load\(/.test(clientSrc) && /exports\.apply/.test(clientSrc))
 
 // ---------- 5. hms_emulator degradation (no devecocli in fake ctx) ----------
 const emu = registered.find((t) => t.name === 'hms_emulator')
