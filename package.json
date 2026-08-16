@@ -54,8 +54,5 @@
     "plugin",
     "agent"
   ],
-  "license": "MIT",
-  "dependencies": {
-    "ws": "^8.21.3"
-  }
+  "license": "MIT"
 }
