@@ -5,3 +5,7 @@ node_modules/
 Thumbs.db
 CONTINUITY.md
 `.hvigor/
+
+# local debug/verification sandbox.tmp-verify/
+# lockfile is not shipped (zero-runtime-dependency plugin)
+package-lock.json
