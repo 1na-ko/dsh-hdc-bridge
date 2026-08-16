@@ -124,6 +124,67 @@ const build2 = reg2.find((t) => t.name === 'hms_build')
 const br = await build2.execute({ action: 'build', projectPath: 'F:/other/proj' }, exec)
 check('build-boundary', br.ok === false && br.outsideWorkspace === true && /工作区之外/.test(br.error || ''), JSON.stringify({ ok: br.ok, outside: br.outsideWorkspace }))
 
+// ---------- 7. client bundle replay (stubbed DOM, real mount + poll) ----------
+// Executes the actual browser bundle in Node with a permissive DOM stub so the
+// whole apply/mount/poll/render path runs — the class of bug that broke the
+// loader entry in v0.7.0 (undefined.then) is caught here, not by a static grep.
+function makeEl(id) {
+  const listeners = {}
+  const el = {
+    id: id || '', children: [], listeners,
+    style: {}, classList: { add() {}, remove() {} }, dataset: {},
+    textContent: '', innerHTML: '', type: '', title: '', src: '', disabled: false,
+    offsetLeft: 0, offsetTop: 0, offsetWidth: 330, offsetHeight: 400,
+    parentNode: null,
+  }
+  let cls = ''
+  Object.defineProperty(el, 'className', { get: () => cls, set: (v) => { cls = v } })
+  el.addEventListener = (n, f) => { (listeners[n] = listeners[n] || []).push(f) }
+  el.appendChild = (c) => { el.children.push(c); c.parentNode = el; return c }
+  el.removeChild = (c) => { const i = el.children.indexOf(c); if (i >= 0) el.children.splice(i, 1); c.parentNode = null; return c }
+  el.querySelector = (sel) => makeEl(sel)
+  el.querySelectorAll = () => [makeEl('x'), makeEl('x')]
+  el.setAttribute = () => {}
+  el.getAttribute = (n) => (n === 'data-dir' ? 'se' : null)
+  el.setPointerCapture = () => {}
+  el.closest = () => null
+  return el
+}
+const g0 = globalThis
+const savedG = { setInterval: g0.setInterval, clearInterval: g0.clearInterval, setTimeout: g0.setTimeout, clearTimeout: g0.clearTimeout, fetch: g0.fetch, window: g0.window, document: g0.document, localStorage: g0.localStorage, requestAnimationFrame: g0.requestAnimationFrame }
+let loaderCapture = null
+g0.setInterval = () => 0
+g0.clearInterval = () => {}
+g0.setTimeout = () => 0
+g0.clearTimeout = () => {}
+g0.fetch = async () => ({
+  ok: true, status: 200,
+  json: async () => ({ ok: true, hdc: 'hdc.exe', version: '0.7.0', toolchain: { studio: '6.1.1.290', sdk: 24, devecocli: false, knowledge: 28 }, devices: [{ id: '127.0.0.1:5555', type: 'TCP', state: 'Connected', model: 'emulator', name: 'emulator', apiVersion: 23, battery: { capacity: 100, temperature: 25, charging: false } }], system: { mem: { totalMB: 3931, availMB: 2654 }, storage: { size: '5.7G', used: '1.3G', usePct: '25%' }, display: { w: 1256, h: 2760 } }, screenshot: { available: false }, hilog: { available: true, lines: ['I 00000/HiLog: smoke line'] }, preferred: '127.0.0.1:5555', error: '', lastError: '', updatedAt: Date.now() }),
+})
+g0.window = {
+  __ModuleLoader__: { load: (spec) => { loaderCapture = spec } },
+  innerWidth: 1280, innerHeight: 800,
+}
+g0.document = { body: makeEl('body'), head: makeEl('head'), getElementById: (id) => (id === 'hdc-panel-style' ? null : makeEl(id)), createElement: (tag) => makeEl(tag) }
+g0.localStorage = { m: {}, getItem(k) { return k in this.m ? this.m[k] : null }, setItem(k, v) { this.m[k] = String(v) }, removeItem(k) { delete this.m[k] } }
+g0.requestAnimationFrame = (f) => { f(); return 0 }
+const clientMod = await import(new URL('../lib/client.js', import.meta.url).href + '?t=' + Date.now())
+check('client-loader-captured', !!loaderCapture && loaderCapture.id === 'dsh-hdc-bridge')
+const cmod = loaderCapture && loaderCapture.factory(() => {})
+check('client-exports-apply', !!cmod && typeof cmod.apply === 'function')
+let applyThrew = null
+if (cmod) cmod.apply({ effect: (fn) => { try { fn() } catch (e) { applyThrew = e } } })
+await new Promise((r) => setImmediate(r))
+check('client-apply-no-throw', !applyThrew, String(applyThrew && applyThrew.message))
+const bodyKids = g0.document.body.children
+const fabEl = bodyKids.find((x) => x.id === 'hdcp-fab')
+const rootEl = bodyKids.find((x) => x.id === 'hdc-panel-root')
+check('client-fab-mounted', !!fabEl, JSON.stringify(bodyKids.map((x) => x.id)))
+check('client-panel-default-hidden', !!rootEl && rootEl.style.display === 'none', rootEl && rootEl.style.display)
+if (fabEl && fabEl.listeners.click && fabEl.listeners.click[0]) fabEl.listeners.click[0]()
+check('client-fab-toggle-shows', !!rootEl && rootEl.style.display === '', rootEl && rootEl.style.display)
+for (const k of Object.keys(savedG)) { if (savedG[k] !== undefined) g0[k] = savedG[k] }
+
 // ---------- summary ----------
 console.log('')
 console.log(failures === 0 ? 'SMOKE ALL PASS' : 'SMOKE FAILURES: ' + failures)
