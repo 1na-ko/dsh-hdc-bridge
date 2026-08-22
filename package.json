@@ -29,9 +29,6 @@
     "notices.json",
     "scripts/license-check.mjs"
   ],
-  "optionalDependencies": {
-    "@deveco/deveco-cli": "^1.2.2"
-  },
   "scripts": {
     "license-check": "node scripts/license-check.mjs"
   },

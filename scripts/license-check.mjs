@@ -55,8 +55,8 @@ if (pkg) {
     }
   }
   for (const item of notices?.incorporatedDependencies || []) {
-    if (!pkg.optionalDependencies || !Object.keys(pkg.optionalDependencies).includes(item.package)) {
-      fail(`notices.json incorporatedDependencies "${item.id}" (${item.package}) is not declared in package.json optionalDependencies`)
+    if (!declared.has(item.package)) {
+      fail(`notices.json incorporatedDependencies "${item.id}" (${item.package}) is not declared in package.json dependencies`)
     }
   }
 }

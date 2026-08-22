@@ -69,15 +69,15 @@ dsh --profile <name>
 - HarmonyOS 设备/模拟器；真机需开发者模式 + USB 调试
 - hdc 二进制自动探测：DevEco Studio 常见 SDK 路径（`<DevEco>\sdk\<apiVer>\openharmony\toolchains\hdc.exe`，apiVer 覆盖 default/10…18）→ PATH（`where.exe` / `Get-Command` / `which`）
 - 截图查看需图像输入模型；纯文本模型可用 `hdc_ui_dump` 做文本化 UI 检查
-- 可选后端 `@deveco/deveco-cli`（MIT）随插件作为 optionalDependency 自动安装（pnpm 失败容忍）；构建/签名/lint 的 `--format json` 能力需本机 DevEco Studio ≥ 6.1.0（macOS/Windows，Node ≥ 18）。签名前需一次人工 `devecocli auth login`（浏览器 OAuth）
+- 可选后端 `@deveco/deveco-cli`（MIT）**不随插件安装**（插件零依赖，安装期不执行任何第三方脚本）：需要构建/签名/lint/模拟器控制时自行 `npm i -g @deveco/deveco-cli`（需 DevEco Studio ≥ 6.1.0，macOS/Windows，Node ≥ 18）；未安装时相关工具全部优雅降级并给出安装指引。签名前需一次人工 `devecocli auth login`（浏览器 OAuth）
 - `hms_api` / `hms_lint rules` 直接读本机 DevEco Studio/SDK 安装（零再分发）；未装 Studio 时这两项降级并给出指引
 - `hms_knowledge` 的 Tier-1 官方知识节选随包内置（28 篇约 1.7MB，CC-BY-4.0 逐字节选并附署名 + 逐文件溯源），**离线可用**，无需任何本机安装
 - `hms_api_change`（check compat）需要更高版本的 DevEco Studio（实测 6.1.0.830 报"min required 26.0.0.810"）；不满足时工具返回官方错误原文 + 升级指引，并提示先用 `hms_api` 的 `@since/@deprecated` 版本知识
 
 ## 依赖与许可合规
 
-- 所有运行时依赖显式声明；本包代码保持零第三方 npm 依赖（解析器全部手写）
-- 引用资源严格分四类并记录于 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)（机器源 `notices.json`）：① 随装依赖（devecocli，MIT）；② 随包内容（`knowledge/` 官方文档逐字节选，CC-BY-4.0 署名 + 逐文件溯源）；③ 改写内容（`deveco-cli` 技能改编自官方 SKILL.md，MIT 版权声明保留）；④ 仅引用不分发（SDK .d.ts、codelinter 规则、harmony-next.skills 等——本机读取或链接指路）
+- **本包零 npm 依赖**（安装期不执行任何第三方脚本）；devecocli 为可选后端，需要时由用户自行安装（见上）
+- 引用资源严格分四类并记录于 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)（机器源 `notices.json`）：① 可选后端（devecocli，MIT，**不随装**——本机探测/PATH 使用）；② 随包内容（`knowledge/` 官方文档逐字节选，CC-BY-4.0 署名 + 逐文件溯源）；③ 改写内容（`deveco-cli` 技能改编自官方 SKILL.md，MIT 版权声明保留）；④ 仅引用不分发（SDK .d.ts、codelinter 规则、harmony-next.skills 等——本机读取或链接指路）
 - 发布前跑 `npm run license-check` 门禁：白名单校验（MIT/Apache-2.0/CC-BY-4.0/ISC/BSD/0BSD）、依赖声明与 notices 一致性、改写内容版权行存在性
 
 ## 权限与沙箱

@@ -1,15 +1,5 @@
 {
-  "incorporatedDependencies": [
-    {
-      "id": "deveco-cli",
-      "package": "@deveco/deveco-cli",
-      "version": "^1.2.2",
-      "license": "MIT",
-      "copyright": "Copyright (c) 2026 Huawei Device Co., Ltd.",
-      "source": "https://gitcode.com/openharmony-sig/deveco-cli",
-      "usage": "Optional backend for build/sign/lint/docs tools (hms_build, hms_lint, hms_docs). Declared as an optionalDependency so it installs alongside the plugin; never bundled into the tarball."
-    }
-  ],
+  "incorporatedDependencies": [],
   "derivedContent": [
     {
       "id": "deveco-cli-skill",
@@ -29,6 +19,11 @@
     }
   ],
   "referenceOnly": [
+    {
+      "id": "deveco-cli",
+      "name": "@deveco/deveco-cli (MIT, Copyright (c) 2026 Huawei Device Co., Ltd.)",
+      "reason": "Optional backend resolved at runtime from the user’s own install (local package probe or PATH). Not declared as a dependency, so installing the plugin runs no third-party install-time code; never bundled."
+    },
     {
       "id": "harmony-next-skills",
       "name": "linhay/harmony-next.skills",
