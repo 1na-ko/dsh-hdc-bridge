@@ -11,3 +11,4 @@ REVIEW-BRIEF-pr5.md
 # local debug/verification sandbox.tmp-verify/
 # lockfile is not shipped (zero-runtime-dependency plugin)
 package-lock.json
+.pr6-copy/

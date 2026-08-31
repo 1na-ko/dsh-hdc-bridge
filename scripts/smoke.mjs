@@ -6,6 +6,11 @@ import { readFile, readdir } from 'node:fs/promises'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
+import { isDevEcoProductInfo, discoverHdcCandidates, parseRegistryPathEntries, parseRegistryPaths, splitPathEntries } from '../lib/studio.mjs'
+import { snippetFor } from '../lib/sdk-dts.mjs'
+import * as compileOut from '../lib/compile-output.mjs'
+import { formatCommandResult, formatDeviceSelectionPrompt } from '../lib/compile-cli.mjs'
+import { panelHdcCandidates, parsePanelTargets } from '../lib/panel.mjs'
 let failures = 0
 function check(name, cond, extra) {
   console.log((cond ? 'PASS' : 'FAIL') + ' [' + name + ']' + (cond || extra === undefined ? '' : ' ' + extra))
@@ -39,6 +44,7 @@ function makeFakeShell(rules, sink) {
     },
   }
 }
+const fakeShell = () => makeFakeShell(DEFAULT_RULES, null)
 function makeCtx() {
   return {
     get(n) { if (n === 'skills') return { register: (s) => { skills.push(s); return () => {} } }; return undefined },
@@ -54,10 +60,31 @@ const exec = { agent: { session: undefined } }
 const lastTarget = () => { const m = [...seen].reverse().find((c) => c.includes('-t')); return m ? (m.match(/-t '([^']+)'/) || [])[1] : '' }
 
 // ---------- 1. registration ----------
-check('tools=20', registered.length === 20, 'got ' + registered.length)
-check('skills=3', skills.length === 3, 'got ' + skills.length)
+check('tools=25', registered.length === 25, 'got ' + registered.length)
+check('skills=5', skills.length === 5, 'got ' + skills.length)
 check('skills-source-runtime', skills.every((s) => s.source === 'runtime'), JSON.stringify(skills.map((s) => s.name + ':' + s.source)))
+check('compile-tools-registered', ['switch_cwd', 'build_project', 'arkts_check', 'start_app', 'hdc_log'].every((name) => registered.some((tool) => tool.name === name)))
 check('routes=4', routes.length === 4, routes.map((r) => r.path).join(','))
+const registryFixture = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Huawei\\DevEco Studio\\243\r\n    (Default)    REG_SZ    C:\\Users\\tester\\DevEco Studio\r\n    Build    REG_SZ    243.1\r\n'
+check('studio-registry-path-parser', parseRegistryPaths(registryFixture)[0] === 'C:\\Users\\tester\\DevEco Studio')
+check('studio-path-entry-parser', JSON.stringify(splitPathEntries('C:\\DevEco Studio\\bin;D:\\tools', ';')) === JSON.stringify(['C:\\DevEco Studio\\bin', 'D:\\tools']))
+const pathRegistryFixture = 'Path    REG_EXPAND_SZ    C:\\DevEco Studio\\sdk\\default\\openharmony\\toolchains;D:\\tools\\bin\r\n'
+check('studio-registry-path-entry-parser', JSON.stringify(parseRegistryPathEntries(pathRegistryFixture)) === JSON.stringify(['C:\\DevEco Studio\\sdk\\default\\openharmony\\toolchains', 'D:\\tools\\bin']))
+check('studio-product-identity', isDevEcoProductInfo({ name: 'DevEco Studio', productVendor: 'Huawei' }) && !isDevEcoProductInfo({ name: 'PyCharm', productVendor: 'JetBrains' }))
+const discoveredHdc = discoverHdcCandidates().candidates[0]
+if (discoveredHdc) {
+  check('panel-uses-discovered-hdc', panelHdcCandidates().includes(discoveredHdc.path), JSON.stringify({ discoveredHdc, panelCandidates: panelHdcCandidates().slice(0, 4) }))
+} else {
+  console.log('SKIP [panel-uses-discovered-hdc] no discoverable hdc candidates on this host')
+}
+const targetFixture = 'HUAWEI_MATEPAD\ttcp\tConnected\t192.168.1.11:12345\nCOM3\tCOM3\nCOM4\tCOM4\tDisconnected\n'
+check('panel-filters-serial-targets', JSON.stringify(parsePanelTargets(targetFixture).map((target) => target.id)) === JSON.stringify(['HUAWEI_MATEPAD']))
+const snippetFixture = 'export function update(asset: Asset, query: Query): void\nexport function query(asset: Asset): Result\nexport function remove(asset: Asset): void'
+const queryWindows = snippetFor(snippetFixture, 'query', 40)
+check('sdk-snippet-exact-name', queryWindows.length === 1 && queryWindows[0].text.includes('function query'))
+check('build-output-failure-status', compileOut.formatBuildProjectOutput({ stdout: 'Build completed successfully (exitCode=0)', stderr: 'hvigor ERROR: ENOENT', exitCode: 1 }).text.includes('BUILD FAILED (exitCode=1)'))
+check('build-output-truncate-export', compileOut.truncateOutput(Array.from({ length: 55 }, (_, i) => 'line-' + i).join('\n')).truncated === true)
+check('compile-cli-source-formatting', formatDeviceSelectionPrompt('\u001b[32mName  Kind\nPhone  device\u001b[0m', '').includes('请指定要使用的设备。') && !/\u001b\[/.test(formatCommandResult('devecocli device list', { stdout: '\u001b[32mout\u001b[0m', stderr: '' })))
 
 // ---------- 2. device memory ----------
 const hilog = registered.find((t) => t.name === 'hdc_hilog')
@@ -70,6 +97,65 @@ check('memory-flow', t1 === 'DEV_A' && t2 === 'DEV_B' && t3 === 'DEV_B' && t4 ==
 connected = ['DEV_A', 'DEV_B']
 const lr = await listTool.execute({}, exec)
 check('list-preferred', lr.preferred === 'DEV_A' && lr.preferredActive === true, JSON.stringify({ preferred: lr.preferred, active: lr.preferredActive }))
+const startTool = registered.find((tool) => tool.name === 'start_app')
+const noDeviceStart = await startTool.execute({}, exec)
+check('start-app-no-hvd-does-not-auto-deploy', noDeviceStart.ok === false && !noDeviceStart.hdcFallback && noDeviceStart.availableDevices.some((target) => target.id === 'DEV_A') && /请指定要使用的设备/.test(noDeviceStart.text || '') && !/devecocli background|未检测到可用设备/.test(noDeviceStart.text || ''), JSON.stringify(noDeviceStart))
+
+// Upstream regression cases: an already connected tconn is success, and
+// Windows absolute paths are normalized even when the mounted host shell is
+// not PowerShell (for example Git Bash).
+const connectTool = registered.find((tool) => tool.name === 'hdc_connect')
+DEFAULT_RULES.unshift([(c) => c.includes('tconn'), () => 'Target is connected, repeat operation'])
+const repeatConnect = await connectTool.execute({ address: '192.168.1.11:34569' }, exec)
+check('connect-repeat-idempotent', repeatConnect.ok === true, JSON.stringify(repeatConnect))
+DEFAULT_RULES.shift()
+const installTool = registered.find((tool) => tool.name === 'hdc_install')
+seen.length = 0
+await installTool.execute({ hapPath: 'E:/ScribePad/entry/build/default/outputs/default/app.hap' }, exec)
+const installLine = [...seen].reverse().find((line) => line.includes('install')) || ''
+check('install-absolute-path-normalized', process.platform === 'win32' ? (!installLine.includes('E:/') && installLine.includes('E:\\ScribePad\\entry\\build')) : installLine.includes('E:/ScribePad'), installLine)
+
+// A fresh host instance must initialize hdc itself before the first
+// list_devices call; this guards the regression where the result depended on
+// an earlier hdc_* tool having already discovered the executable.
+const freshRegistered = []
+mod.apply({
+  get() { return undefined },
+  inject() {},
+  shell: fakeShell(),
+  tools: { register: (d) => freshRegistered.push(d) },
+  effect: (fn) => fn(),
+})
+const freshList = freshRegistered.find((tool) => tool.name === 'hdc_log')
+const firstList = await freshList.execute({ action: 'list_devices' }, exec)
+check('list-devices-first-call', firstList.ok === true && firstList.deviceCount === 2 && firstList.preferred === 'DEV_A' && firstList.preferredActive === true && Array.isArray(firstList.targets), JSON.stringify(firstList))
+let renderedList = ''
+try { renderedList = freshList.output.render({}, firstList)[0].text } catch (error) { renderedList = String(error && error.message ? error.message : error) }
+let renderedJson = null
+try { renderedJson = JSON.parse(renderedList) } catch { /* assertion below reports the raw text */ }
+check('list-devices-render-json', !!renderedJson && Array.isArray(renderedJson.devices) && Array.isArray(renderedJson.targets) && 'preferredActive' in renderedJson, renderedList)
+
+const hostSrc = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8')
+check('hvigor-build-log-isolation', /HVIGOR_USER_HOME/.test(hostSrc) && /build-logs/.test(hostSrc) && /dsh-hvigor-tmp/.test(hostSrc) && /retriedIsolatedHome/.test(hostSrc) && hostSrc.includes("joinPath(base, '.dsh-hvigor-tmp')") && /--stop-daemon/.test(hostSrc) && /--no-daemon/.test(hostSrc) && /JAVA_HOME/.test(hostSrc))
+check('hvigor-jbr-daemon-reset', /daemonStopped: true/.test(hostSrc) && /HVIGOR_USER_HOME/.test(hostSrc) && /app_packing_tool\.jar/.test(hostSrc) && /onDeviceTest/.test(hostSrc))
+check('hms-build-no-empty-success', hostSrc.includes('function buildResultOk') && hostSrc.includes('buildResultOk(r) && !deMojo') && hostSrc.includes('buildResultOk(r) && !mojo') && hostSrc.includes('artifactVerified'))
+check('hms-build-run-ensures-hdc', hostSrc.includes('await ensureHdc(policy)') && hostSrc.includes('install({ hapPath: hap, target: q(args.device) || undefined }, policy)'))
+check('hms-build-run-verifies-mission', hostSrc.includes('missionVerified: Boolean(mission.ok)') && hostSrc.includes("appAction({ action: 'start', bundleName, target: q(args.device) || undefined }, policy)"))
+check('build-project-clean-rebuilds', hostSrc.includes("const cleanArgv = ['build', 'clean']") && hostSrc.includes("compileCli.commandText(cleanArgv) + ' && ' + compileCli.commandText(argv)") && hostSrc.includes("task: 'assembleHap'"))
+check('hms-build-output-strips-ansi', hostSrc.includes('output: compileOut.stripAnsi(fb.output)') && hostSrc.includes('output: compileOut.stripAnsi(deOutput)'))
+check('hms-emulator-list-text-fallback', hostSrc.includes("['emulator', 'list', '--format', 'json']") && hostSrc.includes("['emulator', 'list']") && hostSrc.includes('No emulator instances found.'))
+check('hms-api-change-text-fallback', hostSrc.includes("['check', 'compat', 'versions', '--format', 'json']") && hostSrc.includes("['check', 'compat', 'versions']") && hostSrc.includes('compat versions returned no output.'))
+check('hms-api-change-diff-json-output', hostSrc.includes('changes: json != null ? json : null') && hostSrc.includes('JSON.stringify(json, null, 2)'))
+check('hvigor-build-cache-dir-env', /BUILD_CACHE_DIR/.test(hostSrc) && /cache-env/.test(hostSrc) && /hvigorUserHome/.test(hostSrc) && /buildCacheDir/.test(hostSrc))
+check('hvigor-pnpm-prewarm', /preWarmPnpm/.test(hostSrc) && /wrapper.*tools/.test(hostSrc) && /pnpm\.cmd/.test(hostSrc))
+check('hms-api-change-stderr-merge', /mergeStderr/.test(hostSrc) && /2>&1/.test(hostSrc))
+check('hms-emulator-hdc-backfill', /hdcBackfilled/.test(hostSrc) && /isEmulatorTarget/.test(hostSrc))
+check('hms-emulator-start-poll', /pollEmulatorRunning/.test(hostSrc) && /verifiedBy/.test(hostSrc))
+check('hms-emulator-hdc-ensure', hostSrc.includes('await ensureHdc(policy)') && /hdcBackfilled/.test(hostSrc) && /pollEmulatorRunning/.test(hostSrc))
+check('hms-emulator-start-ok-fix', hostSrc.includes('ok: res.ok && poll.running'))
+check('hms-emulator-start-idempotent', hostSrc.includes('start is idempotent') && hostSrc.includes('i.status || i.state'))
+check('hms-api-change-local-version-guard', hostSrc.includes("const COMPAT_MIN = '26.0.0.810'") && /localVersionGuard/.test(hostSrc) && /compatErrorText/.test(hostSrc))
+check('hms-build-hvigor-diagnostics', /hvigorDiag\(/.test(hostSrc) && /daemonStopped:/.test(hostSrc) && /hvigorUserHome:/.test(hostSrc) && /buildCacheDir:/.test(hostSrc))
 
 // ---------- 3. panel routes (env-agnostic paths) ----------
 const mkRes = () => ({ statusCode: 0, headers: {}, body: '', writeHead(c, h) { this.statusCode = c; this.headers = h }, end(b) { this.body = b } })
@@ -103,11 +189,9 @@ const sw = await kn.execute({ action: 'search', keywords: '日志' }, exec)
 check('search-hilog', sw.results.some((x) => x.id === 'hilog'), JSON.stringify(sw.results.slice(0, 3).map((x) => x.id)))
 
 // ---------- 4b. client bundle guards (official client-plugin contract) ----------
-// The browser half must follow the platform client-plugin shape: React from the
-// seed table, a surface registered into the declared 'shell.overlay' slot, and
-// the official data-plugin-css style injection. Regression note: v0.7.0's
-// poll() dropped its 'return' and broke the loader entry — the replay below
-// executes the real bundle, and these guards pin the official wiring.
+// The browser half uses the input-row capsule as its only entry and anchors the
+// panel above it. The replay below checks the real loader wiring and confirms
+// that no portal or persisted floating-window machinery regresses back in.
 const clientSrc = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
 check('client-loader-factory', /window\.__ModuleLoader__\.load\(/.test(clientSrc) && /exports\.apply/.test(clientSrc))
 check('client-react-module', /require\('react'\)/.test(clientSrc) && /require\('react-dom'\)/.test(clientSrc))
@@ -416,13 +500,12 @@ check('skill-mentions-clt-path', skills.some((s) => s.name === 'deveco-cli' && /
     }
     if (shOk !== null) check('posixquote-roundtrip-bash', shOk === true)
     else console.log('SKIP [posixquote-roundtrip-bash] no bash on PATH')
-    // dcFidelityCommand shape: both dialects keep the device-side escape
-    // marker (backslash-apostrophe inside the wrapped text) and stay
-    // host-dialect specific.
+    // dcFidelityCommand shape: both dialects preserve the original command
+    // text while using host-specific wrapping.
     const pwForm = quoting.dcFidelityCommand("ab'c", 'pwsh')
     const nixForm = quoting.dcFidelityCommand("ab'c", 'bash')
     const q3 = String.fromCharCode(39)
-    check('dcfidelity-inner-escape', pwForm.includes('ab' + BS + Q) && nixForm.includes('ab' + BS + Q), JSON.stringify({ pw: pwForm, nix: nixForm }))
+    check('dcfidelity-inner-preserved', pwForm.includes('ab') && nixForm.includes('ab') && !pwForm.includes('ab' + BS + Q) && !nixForm.includes('ab' + BS + Q), JSON.stringify({ pw: pwForm, nix: nixForm }))
     check('dcfidelity-host-split', pwForm !== nixForm && pwForm.startsWith(q3) && nixForm.startsWith(q3))
   }
 }
@@ -430,11 +513,7 @@ const shTool = registered.find((t) => t.name === 'hdc_shell')
 seen.length = 0
 await shTool.execute({ command: "param get ab'c" }, exec)
 const sentLine = seen.find((c) => c.includes('shell'))
-const BSX = String.fromCharCode(92)
-const QX = String.fromCharCode(39)
-// Expected emitted fragment for flavor pwsh: psQuote(inner='param get ab\'c')
-// => 'param get ab\''c'  (the inner escape apostrophe doubles under psQuote)
-check('dclayer-host-marker', !!sentLine && sentLine.includes('param get ab' + BSX + QX + QX + 'c'), JSON.stringify(sentLine))
+check('dclayer-host-marker', !!sentLine && sentLine.includes('base64 -d | sh'), JSON.stringify(sentLine))
 const hostSrcQuoting = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8')
 check('fallback-guard-apostrophe', /!r\.ok && !command\.includes\(APOS\)/.test(hostSrcQuoting))
 
