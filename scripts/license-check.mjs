@@ -62,7 +62,7 @@ if (pkg) {
 }
 
 // --- 3. vendored/ and knowledge/ directories: every file needs a meta.json sibling -
-const vendoredDirs = ['vendored', 'knowledge']
+const vendoredDirs = ['vendored', 'knowledge', 'assets']
 for (const dirName of vendoredDirs) {
   const vendoredDir = join(root, dirName)
   if (!existsSync(vendoredDir)) continue

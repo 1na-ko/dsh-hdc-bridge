@@ -22,6 +22,7 @@ is an optional user-installed binary — see the reference-only table.
 | ID | Name | License | Copyright | Source |
 | --- | --- | --- | --- | --- |
 | deveco-cli-skill | `deveco-cli` runtime skill (`lib/skills.mjs`) | MIT | Copyright (c) 2026 Huawei Device Co., Ltd. | <https://gitcode.com/openharmony-sig/deveco-cli/blob/develop/SKILL.md> |
+| deveco-code-tools | DevEco Code compile helpers (`assets/arkts-check.cjs` + `lib/compile-cli.mjs`, `lib/compile-output.mjs`, `lib/compile-session-cwd.mjs`) | Apache-2.0 | Copyright (c) 2026 Huawei Device Co., Ltd. | <https://gitcode.com/openharmony-sig/deveco-code> |
 | openharmony-docs-tier1 | Tier-1 bundled official knowledge excerpts (`knowledge/*.md`, verbatim zh-CN docs) | CC-BY-4.0 | OpenHarmony documentation (openharmony/docs, © OpenHarmony Project Contributors), CC-BY-4.0 — <https://creativecommons.org/licenses/by/4.0/> | <https://gitee.com/openharmony/docs> |
 
 The skill is a translated summary of the official SKILL.md command reference, not a
