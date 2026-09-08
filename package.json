@@ -1,6 +1,6 @@
 {
   "name": "dsh-hdc-bridge",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "DSH-native HarmonyOS dev assistant: hdc device debugging, an input-row development panel, official-first versioned API docs, DevEco compile assistance, and standalone Command Line Tools support.",
   "author": "inako",
   "repository": {
