@@ -136,6 +136,9 @@ try { renderedJson = JSON.parse(renderedList) } catch { /* assertion below repor
 check('list-devices-render-json', !!renderedJson && Array.isArray(renderedJson.devices) && Array.isArray(renderedJson.targets) && 'preferredActive' in renderedJson, renderedList)
 
 const hostSrc = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8')
+// Regression for issue #7: local staging paths must go through joinPath —
+// hardcoded backslash separators break every POSIX host (macOS/Linux).
+check('no-hardcoded-backslash-dsh-paths', !/\\\\\.dsh-hdc|'\\\\dsh-shot-/.test(hostSrc) && hostSrc.includes("joinPath(root, '.dsh-hdc', 'screenshots')") && hostSrc.includes("joinPath(stageDir, 'layout-'"), 'hardcoded backslash staging paths found in host.js')
 check('hvigor-build-log-isolation', /HVIGOR_USER_HOME/.test(hostSrc) && /build-logs/.test(hostSrc) && /dsh-hvigor-tmp/.test(hostSrc) && /retriedIsolatedHome/.test(hostSrc) && hostSrc.includes("joinPath(base, '.dsh-hvigor-tmp')") && /--stop-daemon/.test(hostSrc) && /--no-daemon/.test(hostSrc) && /JAVA_HOME/.test(hostSrc))
 check('hvigor-jbr-daemon-reset', /daemonStopped: true/.test(hostSrc) && /HVIGOR_USER_HOME/.test(hostSrc) && /app_packing_tool\.jar/.test(hostSrc) && /onDeviceTest/.test(hostSrc))
 check('hms-build-no-empty-success', hostSrc.includes('function buildResultOk') && hostSrc.includes('buildResultOk(r) && !deMojo') && hostSrc.includes('buildResultOk(r) && !mojo') && hostSrc.includes('artifactVerified'))
