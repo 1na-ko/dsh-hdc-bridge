@@ -295,7 +295,7 @@ Web profile 注册以下路由：
 - `/api2/hdc-bridge/screenshot.jpeg`：当前目标截图；
 - `/api2/hdc-bridge/hilog`：面板日志。
 
-面板入口是对话输入行右侧的“鸿蒙”胶囊按钮。点击胶囊展开，面板锚定在胶囊上方；关闭继续使用同一个胶囊按钮。样式使用 DSH 官方 `--dsw-alias-*` token 和 `data-plugin-css` 注入，不使用 portal、浮动独立窗口、拖拽、缩放或布局持久化。
+面板入口挂左侧边栏 `sidebar.footer.action` 槽位（折叠态图标 + 状态点 + 数量角标，展开态「鸿蒙」标签贴排）；点击经 ReactDOM portal 打开右上角浮动面板（可拖拽、八向缩放、收起、归位、× 关闭），样式使用 DSH 官方 `--dsw-alias-*` token 和 `data-plugin-css` 注入，随平台生命周期卸载。
 
 ## 工具链探测和沙箱
 
@@ -315,7 +315,7 @@ Windows + DevEco Studio 6.1.1.300 + SDK API 24 + TCP 真机 `192.168.1.11:12345`
 - build/run 输出 ANSI 清理；
 - 离线知识 28 篇、hms_lint 57+ 规则索引和插件 smoke 回归。
 
-仍需人工覆盖：面板 GUI 视觉逐态、签名 OAuth 成功路径、不同 Studio/SDK 版本和 macOS 真机。
+仍需人工覆盖：面板 GUI 视觉逐态、签名 OAuth 成功路径、不同 Studio/SDK 版本；macOS 宿主经社区报告（issue #7）实测验证（SDK API 26，截图/dump 路径已修复）。
 
 ## 路线图
 
@@ -324,8 +324,8 @@ Windows + DevEco Studio 6.1.1.300 + SDK API 24 + TCP 真机 `192.168.1.11:12345`
 - [x] 按 API 版本整理的官方知识节选随包内置（v0.5：`hms_knowledge`，28 个高频主题逐字节选，CC-BY-4.0 合规）
 - [x] 输入行设备面板（v0.6：Web 宿主 REST 数据通道 + 对话输入行入口）
 - [x] 深度优化 + 面板官方化（v0.7：全量回归 smoke、hdc-core/errors 拆分与 11 条错误码、hms_build 工作区预检、`hms_emulator` 模拟器控制、签名三类指引、Tier-1 扩至 28 篇；面板使用官方 client 槽位和主题 token，胶囊上方锚定展开）
-- [x] 上游整合移植（v0.10：会话编译闭环五工具、运行时技能补全、输入行胶囊上方锚定面板）
-- [ ] macOS 实机验证
+- [x] 上游整合移植（v0.9.0：吸收 PR #6——会话编译闭环五工具、运行时技能补全、emulator hdc 交叉校验、CLT 双形态；面板保持官方 client 形态）
+- [x] macOS 宿主路径兼容（v0.9.1：社区报告 + 实测验证，joinPath 化修复截图/dump 暂存路径；其余工具待完整实机回归）
 - [x] 统一 hdc 发现 + 支持独立 Command Line Tools（v0.10：面板/工具层单源探测、DEVECO_SDK_HOME 动态根、CLT >=26 双形态识别，SDK/hdc/hvigorw/codelinter 全链自动覆盖，Linux 仅 CLT 形态）
 
 ## License
