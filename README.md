@@ -39,17 +39,17 @@
 | `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤，并解析结构化摘要（错误名/信息/错误码/源码帧/已知错误码提示） |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
 | 错误码提示 | install / app / build 失败按 11 条已知错误码附中文修复建议（9568332 签名未绑 UDID→AGC 登记设备、9568289/9568322 签名配置、1300002 空间不足…）；签名类错误附三类修复（AGC 证书配置 / 重装自签名 / 换 debug 签名）+ 直达 AGC 链接 |
-| `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警 |
+| `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警；CLT 形态额外回显 `apiVersion` 与根识别方式（version.txt / sdk-pkg.json） |
 | `hms_build` | 官方构建/签名/运行通道：status / build / run / sign / clean；devecocli 缺失时自动回退本机 hvigorw + hdc_install + hdc_app 闭环 |
 | `hms_api` | 官方优先的版本化 API 知识：读本机 SDK `.d.ts`（`@since`/`@deprecated`/`@syscap` 精确到 API 版本），按目标版本分类"可用/已废弃/不可用" |
 | `hms_knowledge` | **离线随包官方知识层（Tier-1）**：OpenHarmony 官方文档（CC-BY-4.0）未改文字节选 **28 篇**高频 API 模块、窗口（window/Window 类）、导航组件 Navigation 与应用模型/ArkTS 指南（大文件按节选入，文件内附节选声明），无需 SDK/CLI/网络。catalog / read（先目录后按小节读）/ search |
 | `hms_docs` | 官方本地文档检索：`devecocli docs` search / read / catalog（Tier-2：全量文档，需 devecocli） |
 | `hms_api_change` | 官方跨版本破坏性变更扫描：`devecocli check compat`（versions / diff）——回答"知识在哪一版变了" |
-| `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint） |
+| `hms_lint` | 官方 lint：rules（本机 57+ 条 codelinter 规则索引）/ read-rule / check（devecocli check lint——JSON 报告经 `--output-path` 落工作区暂存、读后即删；回传 `filesChecked`，为 0 时给出「本次未检查任何文件」告警） |
 | `hms_emulator` | 官方模拟器控制（devecocli emulator）：list / start / stop / create / delete + 状态注入 shake / power / rotate / volume / fold / battery / geolocation / sensor / scene；未装 CLI 时按官方 SKILL.md 指路安装（第 20 个工具） |
 | `switch_cwd` | 为当前会话切换 HarmonyOS 工程根目录，供后续编译工具使用 |
-| `build_project` | 构建项目并验证新 `.hap` 产物；devecocli 通道失败时回退到本机 hvigorw |
-| `arkts_check` | 通过 DevEco Studio SDK ets-loader 进行 ArkTS 静态检查；未传文件时自动收集 `.ets` |
+| `build_project` | 构建项目并验证 `.hap` 产物（增量构建产物未变不再判失败，仅缺失才失败并保留 stale 告警）；devecocli 通道失败时回退到本机 hvigorw（CLT 的 `hvigor/bin/hvigorw.js` 用工具链自带 node 运行） |
+| `arkts_check` | 通过 SDK ets-loader 进行 ArkTS 静态检查（DevEco Studio 优先，独立 CLT 兜底）；未传文件时自动收集 `.ets` |
 | `start_app` | 不重新构建地部署启动；devecocli 不可用时回退至 hdc 安装和启动 |
 | `hdc_log` | 收集、清除或列出设备日志；支持关键词、bundle 和 PID 过滤 |
 | 运行时技能 | `hdc-bridge`、`deveco-cli`、`harmonyos-knowledge`、`deveco-compile` 与本地 `harmony-next` 指引，模型按需加载 |
@@ -73,13 +73,13 @@ dsh --profile <name>
 
 ## 环境要求
 
-- **DSH ≥ 0.2.0**：上游 0.2.0-rc.2 起把 `ctx.shell.run()` 换成 `resolve()` + `execute()`（句柄 `result()` 取结果）。本插件跟随新版契约；在更旧的 DSH 上设备类工具会直接给出「DSH 版本过旧」的明确报错，而不是误导性的 `hdc not found`
+- **DSH ≥ 0.1.7-rc.2（推荐 ≥ 0.2.0-rc.2，0.2.0-rc.2 已实测）**：上游 0.2.0-rc.2 起把 `ctx.shell.run()` 换成 `resolve()` + `execute()`（句柄 `result()` 取结果）——新契约为准；0.1.5 及更早的旧线（`run()`）由兼容垫片接管，两条线都可用。两条 seam 都不存在的宿主会直接给出「seam 缺失」的明确报错，而不是误导性的 `hdc not found`
 - HarmonyOS 设备/模拟器；真机需开发者模式 + USB 调试
 - hdc 二进制自动探测（工具与面板共用同一套候选源）：显式 `devecoPath` / `DEVECO_STUDIO_HOME` / `DEVECO_HOME` / `DEVECO_SDK_HOME` → Windows 注册表（含 WOW6432Node）→ 非默认 DevEco/CLT SDK 根 → 默认安装根（apiVer 覆盖 default/10…18）→ PATH 回退（`where.exe` / `Get-Command` / `which`）；面板优先复用工具层已解析路径，两侧行为一致
 - 截图查看需图像输入模型；纯文本模型可用 `hdc_ui_dump` 做文本化 UI 检查
 - 可选后端 `@deveco/deveco-cli`（MIT）**不随插件安装**（插件零依赖，安装期不执行任何第三方脚本），工具链二选一：
   - **路线 A｜DevEco Studio**：本机装 DevEco Studio ≥ 6.1.0（macOS/Windows）+ `npm i -g @deveco/deveco-cli`；
-  - **路线 B｜独立 Command Line Tools**：华为官方 zip 发行版（codelinter / hvigorw / ohpm / emulator / 内嵌 SDK，≥ 26.0.0，解压即用），下载自 developer.huawei.com/consumer/cn/download/command-line-tools-for-hmos，设置 `DEVECO_CLI_CLT_PATH` 指向解压目录即可被自动识别；**Linux 主机仅支持此形态**。
+  - **路线 B｜独立 Command Line Tools**：华为官方 zip 发行版（codelinter / hvigorw / ohpm / emulator / 内嵌 SDK，≥ 26.0.0，解压即用），下载自 developer.huawei.com/consumer/cn/download/command-line-tools-for-hmos，设置 `DEVECO_CLI_CLT_PATH`（或 `COMMAND_LINE_TOOL_PATH`）指向解压目录即可被自动识别；根识别支持 `version.txt` 与无 `version.txt` 的发行形态（HNP/系统集成包：以 `sdk/default` 布局为准，世代号取自 `sdk/default/sdk-pkg.json`）；**Linux 主机仅支持此形态**。
   - 未安装时相关工具全部优雅降级并给出安装指引；`hms_setup` 一眼可查当前 `toolchainKind`（studio / clt）。签名前需一次人工 `devecocli auth login`（浏览器 OAuth）
 - 本机无任何工具链时仍可用：hdc_* 全部工具、设备面板与 Tier-1 离线知识层（随包内置）
 - `hms_api` / `hms_lint rules` 直接读本机 DevEco Studio/SDK 安装（零再分发）；未装 Studio 时这两项降级并给出指引
@@ -117,12 +117,16 @@ dsh --profile <name>
 | v0.7 模拟器全量 | 20 工具 + 4 REST 路由 + 知识层 28 篇读取 + `hms_emulator` 降级指路 ✓（发布前回归） |
 | v0.7.4 统一 hdc 发现（issue #4 回归） | 工具层候选全败时 PATH 回退命中、面板复用工具层解析结果、面板自身 PATH 回退三场景断言 ✓（smoke）；真机环境经 `DEVECO_SDK_HOME` 动态根端到端解析直连 ✓ |
 | v0.9 回归 | 25 工具 + 5 运行时技能 + 4 REST 路由 + 官方 slots 面板 + 知识层 28 篇读取（发布前 smoke） |
+| 社区 issue 批次（#8-#13）回归 | Windows + DSH 0.2.0-rc.2 实测：shell 双 seam 兼容（新线 execute / 旧线 run）、bash 宿主先探口味再探 CLI、无 version.txt 的 CLT 树识别 + 世代门、arkts_check 的 Studio→CLT 回退、hms_lint 经 --output-path 取回报表；smoke 118 项断言全绿（含假 CLT 树/假 seam/假 CLI 写报表的行为级用例） |
 
 ## 已知限制 / Known limitations
 
 - `snapshot_display` 仅支持 `.jpeg`（API 10+ 实测；API 24 真机 2800×1840 已验证）
 - 真机安装需签名 profile 绑定设备 UDID，否则报 `9568332 install sign info inconsistent`（应用签名问题，非插件问题）
 - hdc 客户端对远端失败可能仍返回退出码 0，插件以输出标记 + 落盘校验兜底
+- `hms_lint check` 的 JSON 报表依赖 CLI 的 `--output-path`（Studio ≥ 6.1 / CLT ≥ 26）：报表暂存在工作区 `.dsh-hdc/lint/` 并读取后删除；旧版 CLI 仍按 stdout JSON 兼容解析
+- `arkts_check` 的随包 checker 只识别 `<root>/sdk/default/...` 与 `<root>/sdk/openharmony/...` 两种 SDK 布局（CLT 实机布局即前者）；`<root>/sdk/<api>/...` 的社区变体需把 `DEVECO_CLI_CLT_PATH`/Studio 指到与布局匹配的根
+- hvigorw 回退的 `kind=js` 入口（CLT 无 `bin/` 时）必须由工具链自带 node 运行：CLT `<root>/node`，Studio `<root>/tools/node`，缺失时退回宿主 node
 - `hdc_shell` 的命令跨三层解析（本机宿主 shell → hdc 参数拼接 → 设备端 sh），插件自 v0.8.1 起自动逐层转义保证保真（pwsh 与 POSIX 宿主一致）；命令中的其余 sh 元字符（双引号、`$`、`;` 等）按设备端 sh 原语义生效，请直接传入目标语义的合法命令- **UI 输入实战经验（真机实测）**：
   - 混合字符串（数字→字母→数字）注入时，IME 模式切换会稳定吞掉紧跟字母后的第一个字符；规避：分段输入 + `hdc_ui_dump` 校验 + 缺失字符单独补发
   - 软键盘会改变页面布局：每次点击/输入前使用最新 dump 的坐标，否则可能点到键盘区
@@ -328,6 +332,7 @@ Windows + DevEco Studio 6.1.1.300 + SDK API 24 + TCP 真机 `192.168.1.11:12345`
 - [x] 上游整合移植（v0.9.0：吸收 PR #6——会话编译闭环五工具、运行时技能补全、emulator hdc 交叉校验、CLT 双形态；面板保持官方 client 形态）
 - [x] macOS 宿主路径兼容（v0.9.1：社区报告 + 实测验证，joinPath 化修复截图/dump 暂存路径；其余工具待完整实机回归）
 - [x] 统一 hdc 发现 + 支持独立 Command Line Tools（v0.10：面板/工具层单源探测、DEVECO_SDK_HOME 动态根、CLT >=26 双形态识别，SDK/hdc/hvigorw/codelinter 全链自动覆盖，Linux 仅 CLT 形态）
+- [x] 社区 issue 批次 #8-#13（DSH 0.2.0-rc.2 shell 契约迁移 + 双 seam 垫片、bash 宿主 CLI 探测与负缓存失效、无 version.txt 的 CLT 发现与世代门、构建产物判定与 hvigorw node 前缀、arkts_check CLT 回退、lint 报表落盘）
 
 ## License
 

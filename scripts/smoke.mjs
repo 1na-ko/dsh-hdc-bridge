@@ -3,7 +3,7 @@
 // its graceful-degradation paths). Run: node scripts/smoke.mjs
 const MOD_URL = new URL('../lib/host.js', import.meta.url).href
 import { readFile, readdir } from 'node:fs/promises'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
 import { isDevEcoProductInfo, discoverHdcCandidates, parseRegistryPathEntries, parseRegistryPaths, splitPathEntries } from '../lib/studio.mjs'
@@ -31,21 +31,35 @@ const DEFAULT_RULES = [
   [(c) => c.includes('PSVersionTable'), () => '7'],
   [(c) => c.includes('hdc') && c.includes('-v'), () => 'Ver: 3.2.0c'],
 ]
-function makeFakeShell(rules, sink) {
-  const outcomeFor = async (spec) => {
-    const cmd = spec.command || ''
-    if (sink) sink.push(cmd)
-    for (const [pred, reply] of rules) {
-      if (pred(cmd)) { const text = typeof reply === 'function' ? reply() : reply; return { stdout: { text }, stderr: { text: '' }, exitCode: 0, timedOut: false } }
-    }
-    return { stdout: { text: '' }, stderr: { text: '' }, exitCode: 0, timedOut: false }
+function outcomeFor(rules, spec, sink) {
+  const cmd = spec.command || ''
+  if (sink) sink.push(cmd)
+  for (const [pred, reply] of rules) {
+    if (pred(cmd)) { const text = typeof reply === 'function' ? reply(cmd) : reply; return { stdout: { text }, stderr: { text: '' }, exitCode: 0, timedOut: false } }
   }
+  return { stdout: { text: '' }, stderr: { text: '' }, exitCode: 0, timedOut: false }
+}
+function makeFakeShell(rules, sink) {
   return {
     resolve: (q) => q,
     // DSH 0.2.0-rc.2: execute(spec) returns a process handle whose result()
     // (a method) resolves to the outcome the old run() returned directly.
-    execute: async (spec) => ({ result: () => outcomeFor(spec) }),
+    execute: async (spec) => ({ result: () => outcomeFor(rules, spec, sink) }),
   }
+}
+// The pre-0.2.0 seam: ShellExecutor.run(spec) resolves with the outcome itself.
+function makeLegacyShell(rules, sink) {
+  return { resolve: (q) => q, run: async (spec) => outcomeFor(rules, spec, sink) }
+}
+// Minimal fake Command Line Tools tree for the discovery and gate regressions.
+function makeCltFixture(prefix) {
+  const fx = mkdtempSync(joinPath(tmpdir(), prefix))
+  const w = (rel, content) => {
+    const p = joinPath(fx, rel)
+    mkdirSync(joinPath(p, '..'), { recursive: true })
+    writeFileSync(p, content)
+  }
+  return { fx, w }
 }
 const fakeShell = () => makeFakeShell(DEFAULT_RULES, null)
 function makeCtx() {
@@ -443,7 +457,7 @@ check('diag-shows-path-source', diagStr.includes('smoke-fake'), diagStr.slice(0,
     // Backend priority mirrors the toolchain truth on ANY machine: devecocli
     // wins when its package is resolvable, otherwise the CLT hvigorw fallback.
     const cliFound = !!(bs.devecocli && bs.devecocli.found)
-    check('clt-backend-priority', bs.backend === (cliFound ? 'devecocli' : 'hvigorw') && !!bs.hvigorFallback && bs.hvigorFallback.ok === true, JSON.stringify({ backend: bs.backend, hvigor: bs.hvigorFallback }))
+    check('clt-backend-priority', bs.backend === (cliFound ? 'devecocli' : 'hvigorw') && !!bs.hvigorFallback && bs.hvigorFallback.found === true, JSON.stringify({ backend: bs.backend, hvigor: bs.hvigorFallback }))
     const full = await setup4.execute({}, exec)
     check('clt-full-kind', full.toolchainKind === 'clt', JSON.stringify(full.toolchainKind))
     check('clt-full-sdk-api26', !!full.sdk && full.sdk.found === true && full.sdk.apiVersion === 26, JSON.stringify(full.sdk && { root: full.sdk.root, apiVersion: full.sdk.apiVersion }))
@@ -522,6 +536,254 @@ const sentLine = seen.find((c) => c.includes('shell'))
 check('dclayer-host-marker', !!sentLine && sentLine.includes('base64 -d | sh'), JSON.stringify(sentLine))
 const hostSrcQuoting = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8')
 check('fallback-guard-apostrophe', /!r\.ok && !command\.includes\(APOS\)/.test(hostSrcQuoting))
+
+// ---------- 11. issue #8: one tool layer over both shell seams ----------
+// The current seam is execute() → handle.result() (DSH 0.1.7-rc.2+); the older
+// line exposes run() instead, and the plugin must serve both without changing
+// how it consumes the result (issue #8).
+{
+  const regLegacy = []
+  mod.apply({
+    get() { return undefined },
+    inject() {},
+    shell: makeLegacyShell(DEFAULT_RULES, null),
+    tools: { register: (d) => regLegacy.push(d) },
+    effect: (fn) => fn(),
+  })
+  const lt = regLegacy.find((t) => t.name === 'hdc_list_targets')
+  const out = await lt.execute({}, exec)
+  check('shell-seam-run-only-host', out.ok === true && out.targets.length === 2, JSON.stringify(out).slice(0, 180))
+}
+{
+  // No seam at all: the surfaced error must name the seam problem instead of
+  // degrading into the misleading "hdc not found" (issue #8).
+  const regNone = []
+  mod.apply({
+    get() { return undefined },
+    inject() {},
+    shell: { resolve: (q) => q },
+    tools: { register: (d) => regNone.push(d) },
+    effect: (fn) => fn(),
+  })
+  const lt = regNone.find((t) => t.name === 'hdc_list_targets')
+  const out = await lt.execute({}, exec)
+  check('shell-seam-missing-reported', out.ok === false && /shell seam|Unsupported DSH/i.test(out.error || ''), JSON.stringify(out).slice(0, 220))
+}
+
+// ---------- 12. issue #9: shell dialect first, then the CLI probe ----------
+// A bash host must detect its dialect before any command line is built: the
+// panel's toolchain callback used to probe with the pwsh default and cache the
+// failure for the rest of the process.
+{
+  const bashCmds = []
+  const BASH_RULES = [
+    [(c) => c.includes('PSVersionTable'), () => 'bash: line 1: PSVersionTable.PSVersion.Major: command not found'],
+    [(c) => c.includes('command -v devecocli'), () => "/opt/deve'cocli/bin/devecocli"],
+    [(c) => c.includes('--version'), () => '1.3.4'],
+    [(c) => c.includes('list targets'), () => deviceRows(['DEV_A'])],
+  ]
+  const regBash = []
+  mod.apply({
+    get() { return undefined },
+    inject() {},
+    shell: makeFakeShell(BASH_RULES, bashCmds),
+    tools: { register: (d) => regBash.push(d) },
+    effect: (fn) => fn(),
+  })
+  const setupBash = regBash.find((t) => t.name === 'hms_setup')
+  const stBash = await setupBash.execute({ action: 'status' }, exec)
+  const joined = bashCmds.join('\n')
+  const probeIdx = bashCmds.findIndex((c) => c.includes('PSVersionTable'))
+  const cliIdx = bashCmds.findIndex((c) => /devecocli|deveco-cli/.test(c))
+  check('flavor-probe-runs-before-cli', probeIdx >= 0 && cliIdx > probeIdx, JSON.stringify({ probeIdx, cliIdx }))
+  check('flavor-bash-never-pwsh-probe', !/Get-Command devecocli/.test(joined), joined.slice(0, 160))
+  check('flavor-bash-devecocli-found', !!stBash.devecocli && stBash.devecocli.found === true && stBash.devecocli.version === '1.3.4', JSON.stringify(stBash.devecocli))
+}
+{
+  const hostSrcSeam = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8')
+  check('flavor-platform-default', /process\.platform === 'win32'\) \? 'pwsh' : 'bash'/.test(hostSrcSeam))
+  check('flavor-path-probe-flavor-quoted', hostSrcSeam.includes('flavorQuote(first)'))
+  check('cli-cache-drops-on-flavor-change', /dropCliCache\('/.test(hostSrcSeam) && /if \(v !== shellFlavor\) dropCliCache/.test(hostSrcSeam) && /cliCacheFlavor === shellFlavor/.test(hostSrcSeam))
+}
+
+// ---------- 13. issue #10: CLT roots without version.txt + gate ----------
+// The HNP-distributed Command Line Tools ship no version.txt; the layout plus
+// sdk/default/sdk-pkg.json must identify the root and the generation.
+{
+  const { fx, w } = makeCltFixture('dsh-clt-hnp-')
+  w('sdk/default/sdk-pkg.json', JSON.stringify({ apiVersion: '26', version: '26.0.0.105' }))
+  w('sdk/default/openharmony/ets/oh-uni-package.json', JSON.stringify({ apiVersion: 26, version: '26.0.0.105' }))
+  w('sdk/default/openharmony/ets/api/@ohos.smoke.d.ts', 'export const smoke: number;\n')
+  w('hvigor/bin/hvigorw.js', 'console.log(1)\n')
+  const saved = { sdk: process.env.DEVECO_SDK_HOME, clt: process.env.DEVECO_CLI_CLT_PATH, alt: process.env.COMMAND_LINE_TOOL_PATH }
+  const cmds10 = []
+  delete process.env.DEVECO_SDK_HOME
+  process.env.DEVECO_CLI_CLT_PATH = fx
+  process.env.COMMAND_LINE_TOOL_PATH = fx
+  try {
+    const RULES10 = [
+      [(c) => c.includes('PSVersionTable'), () => '7'],
+      [(c) => c.includes('Get-Command devecocli'), () => 'C:\\smoke-fake\\devecocli.cmd'],
+      [(c) => c.includes('--version'), () => '1.3.4'],
+      [(c) => c.includes('check lint'), () => 'Summary: Issues: 0 | Errors: 0 | Warnings: 0 | Suggestions: 0 | Files checked: 0'],
+    ]
+    const reg10 = []
+    mod.apply({
+      get() { return undefined },
+      inject() {},
+      shell: makeFakeShell(RULES10, cmds10),
+      tools: { register: (d) => reg10.push(d) },
+      effect: (fn) => fn(),
+    })
+    const setup10 = reg10.find((t) => t.name === 'hms_setup')
+    const st10 = await setup10.execute({ action: 'status' }, exec)
+    check('clt-root-without-version-txt', !!st10.commandLineTools && st10.commandLineTools.found === true && st10.commandLineTools.layout === 'sdk-pkg.json' && st10.commandLineTools.apiVersion === 26, JSON.stringify(st10.commandLineTools))
+    check('clt-kind-and-sdk', st10.toolchainKind === 'clt' && !!st10.sdk && st10.sdk.found === true && st10.sdk.apiVersion === 26, JSON.stringify({ kind: st10.toolchainKind, sdk: st10.sdk && st10.sdk.apiVersion }))
+    const paths10 = await setup10.execute({ action: 'paths' }, exec)
+    check('clt-command-line-tool-path-echo', paths10.envCommandLineToolPath === fx, String(paths10.envCommandLineToolPath))
+    const build10 = reg10.find((t) => t.name === 'hms_build')
+    const bs10 = await build10.execute({ action: 'status' }, exec)
+    check('clt-js-hvigor-recognised', !!bs10.hvigorFallback && bs10.hvigorFallback.found === true && /hvigorw\.js$/.test(bs10.hvigorFallback.path || ''), JSON.stringify(bs10.hvigorFallback))
+    // The generation gate must open from apiVersion alone (no version.txt):
+    // hms_lint then asks the CLI for a JSON report.
+    const lint10 = reg10.find((t) => t.name === 'hms_lint')
+    await lint10.execute({ action: 'check' }, exec)
+    const lintLine = [...cmds10].reverse().find((c) => c.includes('check lint')) || ''
+    check('clt-generation-gate-opens-json', /--format json/.test(lintLine) && /--output-path/.test(lintLine), lintLine.slice(0, 220))
+  } finally {
+    delete process.env.DEVECO_CLI_CLT_PATH
+    delete process.env.COMMAND_LINE_TOOL_PATH
+    if (saved.sdk !== undefined) process.env.DEVECO_SDK_HOME = saved.sdk
+    if (saved.clt !== undefined) process.env.DEVECO_CLI_CLT_PATH = saved.clt
+    if (saved.alt !== undefined) process.env.COMMAND_LINE_TOOL_PATH = saved.alt
+    try { rmSync(fx, { recursive: true, force: true }) } catch (e) { /* temp cleanup best effort */ }
+  }
+}
+{
+  // A bare sdk/ directory is not a Command Line Tools root (no version marker,
+  // no shipped component directory).
+  const { fx, w } = makeCltFixture('dsh-clt-bare-')
+  w('sdk/default/sdk-pkg.json', JSON.stringify({ apiVersion: '26' }))
+  const saved = { sdk: process.env.DEVECO_SDK_HOME, clt: process.env.DEVECO_CLI_CLT_PATH }
+  delete process.env.DEVECO_SDK_HOME
+  process.env.DEVECO_CLI_CLT_PATH = fx
+  try {
+    const regBare = []
+    mod.apply({
+      get() { return undefined },
+      inject() {},
+      shell: makeFakeShell(DEFAULT_RULES, null),
+      tools: { register: (d) => regBare.push(d) },
+      effect: (fn) => fn(),
+    })
+    const stBare = await regBare.find((t) => t.name === 'hms_setup').execute({ action: 'status' }, exec)
+    check('clt-bare-sdk-not-a-root', !!stBare.commandLineTools && stBare.commandLineTools.found === false, JSON.stringify(stBare.commandLineTools))
+  } finally {
+    if (saved.sdk !== undefined) process.env.DEVECO_SDK_HOME = saved.sdk
+    if (saved.clt === undefined) delete process.env.DEVECO_CLI_CLT_PATH
+    else process.env.DEVECO_CLI_CLT_PATH = saved.clt
+    try { rmSync(fx, { recursive: true, force: true }) } catch (e) { /* temp cleanup best effort */ }
+  }
+}
+
+// ---------- 14. issue #12 / #11: runtime selection and hvigor head ----------
+{
+  const tc = mod._toolchain
+  check('toolchain-seam-exported', !!tc && typeof tc.arktsRuntimeFrom === 'function' && typeof tc.hvigorCommandHead === 'function')
+  const { fx } = makeCltFixture('dsh-toolchain-')
+  const studioRoot = joinPath(fx, 'studio')
+  const cltRoot = joinPath(fx, 'clt')
+  const win = process.platform === 'win32'
+  const studioNode = win ? joinPath(studioRoot, 'tools', 'node', 'node.exe') : joinPath(studioRoot, 'tools', 'node', 'bin', 'node')
+  const cltNode = win ? joinPath(cltRoot, 'node', 'node.exe') : joinPath(cltRoot, 'node', 'bin', 'node')
+  mkdirSync(joinPath(studioNode, '..'), { recursive: true })
+  writeFileSync(studioNode, '')
+  mkdirSync(joinPath(cltNode, '..'), { recursive: true })
+  writeFileSync(cltNode, '')
+  try {
+    const a = tc.arktsRuntimeFrom(studioRoot, cltRoot)
+    const b = tc.arktsRuntimeFrom('', cltRoot)
+    const c = tc.arktsRuntimeFrom('', '')
+    check('arkts-runtime-prefers-studio', a.root === studioRoot && a.node === studioNode, JSON.stringify(a))
+    check('arkts-runtime-falls-back-to-clt', b.root === cltRoot && b.node === cltNode, JSON.stringify(b))
+    check('arkts-runtime-none-is-empty', c.root === '' && c.node === '', JSON.stringify(c))
+    const jsHead = tc.hvigorCommandHead({ kind: 'js', path: 'X:/clt/hvigor/bin/hvigorw.js' }, 'X:/clt/node/node.exe', 'pwsh')
+    check('hvigor-js-runs-under-node', jsHead.indexOf('node.exe') >= 0 && jsHead.indexOf('hvigorw.js') > jsHead.indexOf('node.exe'), jsHead)
+    const launcherHead = tc.hvigorCommandHead({ kind: 'launcher', path: 'X:/clt/bin/hvigorw.bat' }, 'X:/clt/node/node.exe', 'pwsh')
+    check('hvigor-launcher-has-no-node-prefix', launcherHead === mod._quoting.psQuote('X:/clt/bin/hvigorw.bat'), launcherHead)
+    const nixHead = tc.hvigorCommandHead({ kind: 'js', path: "/opt/tool's/hvigorw.js" }, '/usr/bin/node', 'bash')
+    check('hvigor-posix-apostrophe-safe', nixHead.includes("'\\''"), nixHead)
+  } finally {
+    try { rmSync(fx, { recursive: true, force: true }) } catch (e) { /* temp cleanup best effort */ }
+  }
+  const hostSrcToolchain = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8')
+  check('arkts-check-uses-resolved-root', hostSrcToolchain.includes("'--deveco-home', psQuote(arktsRoot)") && hostSrcToolchain.includes("$env:DEVECO_HOME=' + psQuote(arktsRoot)"))
+  check('hvigor-head-shared-builder', hostSrcToolchain.includes('hvigorCommandHead(hvigor, node, shellFlavor)') && (hostSrcToolchain.match(/hvigorHead\(hvigor\)/g) || []).length >= 2)
+}
+
+// ---------- 15. issue #13: the lint report goes to --output-path ----------
+// devecocli 1.3.x writes the JSON report to --output-path (stdout carries only
+// the human summary), so the plugin stages a uniquely named *.json inside the
+// session workspace, reads it, and removes it again.
+{
+  const { fx } = makeCltFixture('dsh-lint-')
+  const cmds13 = []
+  let staged = ''
+  let checked = 12
+  let stdoutJson = false
+  const RULES13 = [
+    [(c) => c.includes('PSVersionTable'), () => '7'],
+    [(c) => c.includes('Get-Command devecocli'), () => 'C:\\smoke-fake\\devecocli.cmd'],
+    [(c) => c.includes('--version'), () => '1.3.4'],
+    [(c) => c.includes('check lint'), (cmd) => {
+      const summary = 'Summary: Issues: 0 | Errors: 0 | Warnings: 0 | Suggestions: 0 | Files checked: ' + checked
+      if (stdoutJson) return JSON.stringify({ issues: [], summary: { filesChecked: checked, issues: 0, errors: 0, warnings: 0, suggestions: 0 } })
+      const m = /--output-path '([^']+)'/.exec(cmd)
+      if (m) {
+        staged = m[1]
+        mkdirSync(joinPath(staged, '..'), { recursive: true }) // the CLI creates parents itself
+        writeFileSync(staged, JSON.stringify({ issues: [], summary: { filesChecked: checked, issues: 0, errors: 0, warnings: 0, suggestions: 0 } }))
+        return summary + '\nFull report: ' + staged
+      }
+      return summary
+    }],
+  ]
+  const saved = { sdk: process.env.DEVECO_SDK_HOME, clt: process.env.DEVECO_CLI_CLT_PATH }
+  delete process.env.DEVECO_SDK_HOME
+  process.env.DEVECO_CLI_CLT_PATH = fx
+  try {
+    const reg13 = []
+    mod.apply({
+      get(n) { if (n === 'sandboxPolicy') return { resolve: () => ({ mode: 'workspace-write', workspaceRoot: fx }) }; return undefined },
+      inject() {},
+      shell: makeFakeShell(RULES13, cmds13),
+      tools: { register: (d) => reg13.push(d) },
+      effect: (fn) => fn(),
+    })
+    const lint13 = reg13.find((t) => t.name === 'hms_lint')
+    const r13 = await lint13.execute({ action: 'check', limit: 5 }, exec)
+    const lintCmd = [...cmds13].reverse().find((c) => c.includes('check lint')) || ''
+    check('lint-output-path-arg', /--output-path '[^']+\.json'/.test(lintCmd), lintCmd.slice(0, 200))
+    check('lint-report-staged-in-workspace', staged.startsWith(fx) && /\.json$/.test(staged), staged)
+    check('lint-limit-dropped-with-report', !/--limit/.test(lintCmd), lintCmd.slice(0, 200))
+    check('lint-report-parsed', r13.ok === true && !!r13.result && r13.result.summary.filesChecked === 12 && r13.filesChecked === 12, JSON.stringify({ ok: r13.ok, fc: r13.filesChecked, err: r13.error }))
+    check('lint-report-removed-after-read', !existsSync(staged), staged)
+    // A clean report that checked nothing must say so instead of reading as a pass.
+    checked = 0
+    const r13zero = await lint13.execute({ action: 'check' }, exec)
+    check('lint-empty-scope-warning', r13zero.ok === true && r13zero.filesChecked === 0 && /0 files checked/.test(r13zero.note || ''), JSON.stringify({ ok: r13zero.ok, note: r13zero.note }))
+    // Older CLIs still print the JSON report on stdout: keep that path working.
+    checked = 7
+    stdoutJson = true
+    const r13stdout = await lint13.execute({ action: 'check' }, exec)
+    check('lint-stdout-json-fallback', r13stdout.ok === true && !!r13stdout.result && r13stdout.result.summary.filesChecked === 7, JSON.stringify({ ok: r13stdout.ok, fc: r13stdout.filesChecked }))
+  } finally {
+    if (saved.sdk !== undefined) process.env.DEVECO_SDK_HOME = saved.sdk
+    if (saved.clt === undefined) delete process.env.DEVECO_CLI_CLT_PATH
+    else process.env.DEVECO_CLI_CLT_PATH = saved.clt
+    try { rmSync(fx, { recursive: true, force: true }) } catch (e) { /* temp cleanup best effort */ }
+  }
+}
 
 // ---------- summary ----------
 console.log('')
