@@ -73,6 +73,7 @@ dsh --profile <name>
 
 ## 环境要求
 
+- **DSH ≥ 0.2.0**：上游 0.2.0-rc.2 起把 `ctx.shell.run()` 换成 `resolve()` + `execute()`（句柄 `result()` 取结果）。本插件跟随新版契约；在更旧的 DSH 上设备类工具会直接给出「DSH 版本过旧」的明确报错，而不是误导性的 `hdc not found`
 - HarmonyOS 设备/模拟器；真机需开发者模式 + USB 调试
 - hdc 二进制自动探测（工具与面板共用同一套候选源）：显式 `devecoPath` / `DEVECO_STUDIO_HOME` / `DEVECO_HOME` / `DEVECO_SDK_HOME` → Windows 注册表（含 WOW6432Node）→ 非默认 DevEco/CLT SDK 根 → 默认安装根（apiVer 覆盖 default/10…18）→ PATH 回退（`where.exe` / `Get-Command` / `which`）；面板优先复用工具层已解析路径，两侧行为一致
 - 截图查看需图像输入模型；纯文本模型可用 `hdc_ui_dump` 做文本化 UI 检查

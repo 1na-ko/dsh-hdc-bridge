@@ -32,16 +32,19 @@ const DEFAULT_RULES = [
   [(c) => c.includes('hdc') && c.includes('-v'), () => 'Ver: 3.2.0c'],
 ]
 function makeFakeShell(rules, sink) {
+  const outcomeFor = async (spec) => {
+    const cmd = spec.command || ''
+    if (sink) sink.push(cmd)
+    for (const [pred, reply] of rules) {
+      if (pred(cmd)) { const text = typeof reply === 'function' ? reply() : reply; return { stdout: { text }, stderr: { text: '' }, exitCode: 0, timedOut: false } }
+    }
+    return { stdout: { text: '' }, stderr: { text: '' }, exitCode: 0, timedOut: false }
+  }
   return {
     resolve: (q) => q,
-    run: async (spec) => {
-      const cmd = spec.command || ''
-      if (sink) sink.push(cmd)
-      for (const [pred, reply] of rules) {
-        if (pred(cmd)) { const text = typeof reply === 'function' ? reply() : reply; return { stdout: { text }, stderr: { text: '' }, exitCode: 0, timedOut: false } }
-      }
-      return { stdout: { text: '' }, stderr: { text: '' }, exitCode: 0, timedOut: false }
-    },
+    // DSH 0.2.0-rc.2: execute(spec) returns a process handle whose result()
+    // (a method) resolves to the outcome the old run() returned directly.
+    execute: async (spec) => ({ result: () => outcomeFor(spec) }),
   }
 }
 const fakeShell = () => makeFakeShell(DEFAULT_RULES, null)
