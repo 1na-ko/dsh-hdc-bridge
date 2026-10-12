@@ -726,7 +726,13 @@ check('fallback-guard-apostrophe', /!r\.ok && !command\.includes\(APOS\)/.test(h
 // the human summary), so the plugin stages a uniquely named *.json inside the
 // session workspace, reads it, and removes it again.
 {
-  const { fx } = makeCltFixture('dsh-lint-')
+  const { fx, w } = makeCltFixture('dsh-lint-')
+  // The JSON report mode is gated on the toolchain generation, so the fixture
+  // must be a real CLT root (apiVersion 26) or the gate closes on hosts without
+  // DevEco Studio (CI) and the assertions below would test the text path.
+  w('sdk/default/sdk-pkg.json', JSON.stringify({ apiVersion: '26', version: '26.0.0.105' }))
+  w('sdk/default/openharmony/ets/oh-uni-package.json', JSON.stringify({ apiVersion: 26 }))
+  w('hvigor/bin/hvigorw.js', 'console.log(1)\n')
   const cmds13 = []
   let staged = ''
   let checked = 12
