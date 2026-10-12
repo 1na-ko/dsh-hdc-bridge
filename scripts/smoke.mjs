@@ -802,6 +802,7 @@ const platformFlavor = process.platform === 'win32' ? 'pwsh' : 'bash'
 
 async function freshInstance(shellRef) {
   const reg = []
+  const sink = []
   const m = await import(MOD_URL + '?env=' + Date.now() + '-' + Math.random())
   m.apply({
     get() { return undefined },
@@ -811,19 +812,23 @@ async function freshInstance(shellRef) {
       execute: async (spec) => {
         if (shellRef.throw) throw new Error(SANDBOX_REFUSAL)
         if (shellRef.reply) return { result: async () => shellRef.reply(spec) }
-        return { result: async () => outcomeFor(DEFAULT_RULES, spec, null) }
+        return { result: async () => outcomeFor(DEFAULT_RULES, spec, sink) }
       },
     },
     tools: { register: (d) => reg.push(d) },
     effect: (fn) => fn(),
   })
-  return reg
+  return { reg, sink }
 }
+// Whether an installed devecocli package resolves is environment dependent (CI
+// checks the repo out without node_modules), so recovery is asserted by watching
+// for a fresh probe command rather than by a found/not-found verdict.
+const probeWasIssued = (sink) => sink.some((c) => /devecocli|--version/i.test(c))
 
 {
   // 12a. a throwing shell must not flip the dialect and must not escape as a throw
   const ref = { throw: true }
-  const reg = await freshInstance(ref)
+  const { reg, sink } = await freshInstance(ref)
   const diag = reg.find((t) => t.name === 'hdc_diag')
   let diagOut
   let threw = ''
@@ -837,18 +842,20 @@ async function freshInstance(shellRef) {
   const blocked = await setup.execute({ action: 'doctor' }, exec)
   check('envfail-cli-probe-deferred', !!blocked && blocked.devecocli.found === false && /deferred/.test(blocked.devecocli.error || ''), JSON.stringify(blocked && blocked.devecocli).slice(0, 200))
   ref.throw = false
-  const recovered = await setup.execute({ action: 'doctor' }, exec)
-  check('envfail-cli-reprobed-after-recovery', !!recovered && recovered.devecocli.found === true, JSON.stringify(recovered && recovered.devecocli).slice(0, 200))
+  sink.length = 0
+  await setup.execute({ action: 'doctor' }, exec)
+  check('envfail-cli-reprobed-after-recovery', probeWasIssued(sink), sink.slice(0, 2).join(' | ').slice(0, 160))
 
   // 12c. a refusal delivered as command output is also a non-cacheable deferral
   const ref2 = { throw: false, reply: () => ({ stdout: { text: '' }, stderr: { text: SANDBOX_REFUSAL }, exitCode: 1, timedOut: false }) }
-  const reg2 = await freshInstance(ref2)
+  const { reg: reg2, sink: sink2 } = await freshInstance(ref2)
   const setup2 = reg2.find((t) => t.name === 'hms_setup')
   const s2 = await setup2.execute({ action: 'doctor' }, exec)
   check('envfail-result-stderr-deferred', !!s2 && /deferred/.test(s2.devecocli.error || ''), JSON.stringify(s2 && s2.devecocli).slice(0, 160))
   ref2.reply = null
-  const s3 = await setup2.execute({ action: 'doctor' }, exec)
-  check('envfail-result-stderr-not-cached', !!s3 && s3.devecocli.found === true, JSON.stringify(s3 && s3.devecocli).slice(0, 160))
+  sink2.length = 0
+  await setup2.execute({ action: 'doctor' }, exec)
+  check('envfail-result-stderr-not-cached', probeWasIssued(sink2), sink2.slice(0, 2).join(' | ').slice(0, 160))
 
   // 12d. static guards
   check('host-flavor-catch-keeps-platform-default', !/catch\s*\{[\s\S]{0,40}shellFlavor = 'bash'/.test(hostSrc) && hostSrc.includes('shell flavor probe unavailable'), 'no forced bash fallback')
