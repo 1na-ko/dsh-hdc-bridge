@@ -791,6 +791,71 @@ check('fallback-guard-apostrophe', /!r\.ok && !command\.includes\(APOS\)/.test(h
   }
 }
 
+// ---------- 12. environment gating (sandbox backend unusable) ----------
+// A host whose sandbox backend refuses every command used to poison the whole
+// process: the dialect probe flipped Windows onto POSIX quoting (which surfaced
+// as a bogus "hdc not found"), and the CLI verdict was cached for the rest of
+// the process. Verdicts measured in such an environment must be neither trusted
+// nor remembered, and no tool may leak the failure as a throw.
+const SANDBOX_REFUSAL = 'sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined.'
+const platformFlavor = process.platform === 'win32' ? 'pwsh' : 'bash'
+
+async function freshInstance(shellRef) {
+  const reg = []
+  const m = await import(MOD_URL + '?env=' + Date.now() + '-' + Math.random())
+  m.apply({
+    get() { return undefined },
+    inject(names, cb) { if (names.includes('webServer')) cb({ webServer: { register: () => {} }, effect: (fn) => fn() }) },
+    shell: {
+      resolve: (q) => q,
+      execute: async (spec) => {
+        if (shellRef.throw) throw new Error(SANDBOX_REFUSAL)
+        if (shellRef.reply) return { result: async () => shellRef.reply(spec) }
+        return { result: async () => outcomeFor(DEFAULT_RULES, spec, null) }
+      },
+    },
+    tools: { register: (d) => reg.push(d) },
+    effect: (fn) => fn(),
+  })
+  return reg
+}
+
+{
+  // 12a. a throwing shell must not flip the dialect and must not escape as a throw
+  const ref = { throw: true }
+  const reg = await freshInstance(ref)
+  const diag = reg.find((t) => t.name === 'hdc_diag')
+  let diagOut
+  let threw = ''
+  try { diagOut = await diag.execute({}, exec) } catch (e) { threw = String(e.message) }
+  check('envfail-tool-never-throws', !threw, threw)
+  check('envfail-flavor-keeps-platform-default', !!diagOut && diagOut.shellFlavor === platformFlavor, JSON.stringify({ flavor: diagOut && diagOut.shellFlavor, expected: platformFlavor }))
+  check('envfail-hdc-error-is-explicit', !!diagOut && /could not run on this host/.test(diagOut.hdcError || ''), String(diagOut && diagOut.hdcError).slice(0, 120))
+
+  // 12b. the CLI verdict is deferred and re-probed once the host can run commands
+  const setup = reg.find((t) => t.name === 'hms_setup')
+  const blocked = await setup.execute({ action: 'doctor' }, exec)
+  check('envfail-cli-probe-deferred', !!blocked && blocked.devecocli.found === false && /deferred/.test(blocked.devecocli.error || ''), JSON.stringify(blocked && blocked.devecocli).slice(0, 200))
+  ref.throw = false
+  const recovered = await setup.execute({ action: 'doctor' }, exec)
+  check('envfail-cli-reprobed-after-recovery', !!recovered && recovered.devecocli.found === true, JSON.stringify(recovered && recovered.devecocli).slice(0, 200))
+
+  // 12c. a refusal delivered as command output is also a non-cacheable deferral
+  const ref2 = { throw: false, reply: () => ({ stdout: { text: '' }, stderr: { text: SANDBOX_REFUSAL }, exitCode: 1, timedOut: false }) }
+  const reg2 = await freshInstance(ref2)
+  const setup2 = reg2.find((t) => t.name === 'hms_setup')
+  const s2 = await setup2.execute({ action: 'doctor' }, exec)
+  check('envfail-result-stderr-deferred', !!s2 && /deferred/.test(s2.devecocli.error || ''), JSON.stringify(s2 && s2.devecocli).slice(0, 160))
+  ref2.reply = null
+  const s3 = await setup2.execute({ action: 'doctor' }, exec)
+  check('envfail-result-stderr-not-cached', !!s3 && s3.devecocli.found === true, JSON.stringify(s3 && s3.devecocli).slice(0, 160))
+
+  // 12d. static guards
+  check('host-flavor-catch-keeps-platform-default', !/catch\s*\{[\s\S]{0,40}shellFlavor = 'bash'/.test(hostSrc) && hostSrc.includes('shell flavor probe unavailable'), 'no forced bash fallback')
+  check('host-env-gating-helpers-present', hostSrc.includes('function policyRunnable(') && hostSrc.includes('function cliDeferred(') && hostSrc.includes('function isEnvFailure('), 'gating helpers')
+  check('host-tool-registry-never-throws', /function registerTool\(definition\) \{[\s\S]{0,500}catch \(e\)/.test(hostSrc), 'registerTool wrapper')
+}
+
 // ---------- summary ----------
 console.log('')
 console.log(failures === 0 ? 'SMOKE ALL PASS' : 'SMOKE FAILURES: ' + failures)
