@@ -12,3 +12,4 @@ REVIEW-BRIEF-pr5.md
 # lockfile is not shipped (zero-runtime-dependency plugin)
 package-lock.json
 .pr6-copy/
+.tmp/
