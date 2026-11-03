@@ -11,6 +11,10 @@ import { snippetFor } from '../lib/sdk-dts.mjs'
 import * as compileOut from '../lib/compile-output.mjs'
 import { formatCommandResult, formatDeviceSelectionPrompt } from '../lib/compile-cli.mjs'
 import { panelHdcCandidates, parsePanelTargets } from '../lib/panel.mjs'
+import { checkPanelRequest, isLoopbackAddress, parseAuthority, trustedAuthorities } from '../lib/http-guard.mjs'
+import { existingHdcCandidates, hdcRootCandidates } from '../lib/hdc-discover.mjs'
+import { createHdcCore } from '../lib/hdc-core.mjs'
+import { createBudget } from '../lib/async-budget.mjs'
 let failures = 0
 function check(name, cond, extra) {
   console.log((cond ? 'PASS' : 'FAIL') + ' [' + name + ']' + (cond || extra === undefined ? '' : ' ' + extra))
@@ -180,16 +184,56 @@ check('hms-build-hvigor-diagnostics', /hvigorDiag\(/.test(hostSrc) && /daemonSto
 // ---------- 3. panel routes (env-agnostic paths) ----------
 const mkRes = () => ({ statusCode: 0, headers: {}, body: '', writeHead(c, h) { this.statusCode = c; this.headers = h }, end(b) { this.body = b } })
 const mkReq = (body) => { const q = { method: 'POST' }; q.on = (ev, cb) => { if (ev === 'data') cb(JSON.stringify(body)); else if (ev === 'end') cb() }; return q }
+// A request that passes the panel fence: loopback Host and peer, a same-origin
+// browser marker, and a JSON body type for state-changing methods.
+const panelReq = (opts = {}) => {
+  const method = opts.method || 'GET'
+  const headers = Object.assign({ host: '127.0.0.1:3080', 'sec-fetch-site': 'same-origin' }, opts.headers || {})
+  if (method === 'POST' && !('content-type' in headers)) headers['content-type'] = 'application/json'
+  const q = { method, headers, socket: { remoteAddress: opts.remoteAddress || '127.0.0.1' } }
+  q.on = (ev, cb) => { if (ev === 'data') cb(JSON.stringify(opts.body === undefined ? {} : opts.body)); else if (ev === 'end') cb() }
+  return q
+}
 const ps = routes.find((r) => r.path === '/api2/hdc-bridge/panel-state')
 const sel = routes.find((r) => r.path === '/api2/hdc-bridge/select')
 const shot = routes.find((r) => r.path === '/api2/hdc-bridge/screenshot.jpeg')
-const r1 = mkRes(); await ps.handler({ method: 'GET', on() {} }, r1)
+const r1 = mkRes(); await ps.handler(panelReq(), r1)
 let s1 = null; try { s1 = JSON.parse(r1.body) } catch (e) {}
 check('panel-state-json', r1.statusCode === 200 && s1 && typeof s1 === 'object' && 'devices' in s1 && 'preferred' in s1 && 'toolchain' in s1, JSON.stringify(Object.keys(s1 || {})))
-const r2 = mkRes(); await sel.handler(mkReq({ target: 'NOT_A_DEVICE' }), r2)
+const r2 = mkRes(); await sel.handler(panelReq({ method: 'POST', body: { target: 'NOT_A_DEVICE' } }), r2)
 check('select-rejects-unknown', r2.statusCode === 400, 'got ' + r2.statusCode)
-const r3 = mkRes(); await shot.handler({ method: 'GET', on() {} }, r3)
+const r3 = mkRes(); await shot.handler(panelReq(), r3)
 check('shot-404-empty', r3.statusCode === 404, 'got ' + r3.statusCode)
+
+// ---------- 3b. panel request fence (issue #15) ----------
+// The routes are a same-origin control surface: a cross-site page must neither
+// drive them (form POST to /refresh) nor read them back through a rebound name.
+const guardFacts = (headers, extra) => checkPanelRequest(
+  { headers, method: 'GET', socket: { remoteAddress: '127.0.0.1' } },
+  Object.assign({ trustedAuthorities: [] }, extra || {}),
+)
+check('panel-guard-accepts-local-same-origin', guardFacts({ host: '127.0.0.1:3080' }).ok === true)
+check('panel-guard-accepts-localhost-name', guardFacts({ host: 'localhost:3080' }).ok === true)
+check('panel-guard-accepts-same-origin-header', guardFacts({ host: '127.0.0.1:3080', origin: 'http://127.0.0.1:3080' }).ok === true)
+check('panel-guard-rejects-cross-site', guardFacts({ host: '127.0.0.1:3080', 'sec-fetch-site': 'cross-site' }).reason === 'cross-site')
+check('panel-guard-rejects-foreign-origin', guardFacts({ host: '127.0.0.1:3080', origin: 'https://evil.example' }).reason === 'origin-mismatch')
+check('panel-guard-rejects-rebound-host', guardFacts({ host: 'evil.example:3080' }).reason === 'host-untrusted')
+check('panel-guard-rejects-missing-host', guardFacts({}).reason === 'missing-host')
+check('panel-guard-rejects-remote-claiming-loopback-host', checkPanelRequest(
+  { headers: { host: '127.0.0.1:3080' }, method: 'GET', socket: { remoteAddress: '192.168.1.9' } },
+  { trustedAuthorities: [] },
+).reason === 'peer-not-local')
+check('panel-guard-peer-ipv6-mapped', isLoopbackAddress('::ffff:127.0.0.1') === true && isLoopbackAddress('fe80::1') === false)
+check('panel-guard-rejects-form-content-type', checkPanelRequest(
+  { headers: { host: '127.0.0.1:3080', 'content-type': 'application/x-www-form-urlencoded' }, method: 'POST', socket: { remoteAddress: '127.0.0.1' } },
+  { trustedAuthorities: [] },
+).reason === 'content-type')
+check('panel-guard-accepts-trusted-authority', guardFacts({ host: 'panel.example:443' }, { trustedAuthorities: [parseAuthority('panel.example')] }).ok === true)
+check('panel-guard-accepts-bind-address', guardFacts({ host: '192.168.1.20:3080' }, { bindHost: '192.168.1.20' }).ok === true)
+check('panel-guard-env-allowlist', trustedAuthorities('panel.example, other.example:8443').length === 2)
+const r4 = mkRes(); await ps.handler(panelReq({ headers: { host: 'evil.example:3080' } }), r4)
+let s4 = null; try { s4 = JSON.parse(r4.body) } catch (e) {}
+check('panel-route-rejects-forged-host', r4.statusCode === 403 && !!s4 && s4.error === 'host-untrusted' && /DSH_HDC_BRIDGE_TRUSTED_HOSTS/.test(s4.hint || ''), JSON.stringify({ status: r4.statusCode, body: s4 }))
 
 // ---------- 4. knowledge layer ----------
 const kn = registered.find((t) => t.name === 'hms_knowledge')
@@ -342,7 +386,7 @@ const setupTool = registered.find((t) => t.name === 'hms_setup')
 let pathsOut = null
 let setupThrew = null
 try { pathsOut = await setupTool.execute({ action: 'paths' }, exec) } catch (e) { setupThrew = e }
-check('hms-setup-paths-no-throw', !setupThrew && Array.isArray(pathsOut && pathsOut.hdcCandidates) && pathsOut.hdcCandidates.length > 0, String(setupThrew && setupThrew.message))
+check('hms-setup-paths-no-throw', !setupThrew && !!pathsOut && pathsOut.ok === true && Array.isArray(pathsOut.hdcCandidates) && Array.isArray(pathsOut.candidates) && Array.isArray(pathsOut.searchedRoots), String(setupThrew && setupThrew.message))
 const libFiles = (await readdir(new URL('../lib/', import.meta.url))).filter((f) => /\.(mjs|js)$/.test(f))
 const offenders = []
 for (const f of libFiles) {
@@ -393,7 +437,7 @@ check('diag-shows-path-source', diagStr.includes('smoke-fake'), diagStr.slice(0,
     },
   })
   const res = mkRes()
-  await refreshHandler(mkReq({ shot: false }), res)
+  await refreshHandler(panelReq({ method: 'POST', body: { shot: false } }), res)
   const stA = JSON.parse(res.body)
   check('panel-bridge-resolution', !!stA && stA.hdc === 'hdc.exe', JSON.stringify(stA && { hdc: stA.hdc, error: stA.error }))
 }
@@ -414,7 +458,7 @@ check('diag-shows-path-source', diagStr.includes('smoke-fake'), diagStr.slice(0,
     },
   })
   const res = mkRes()
-  await refreshHandler(mkReq({ shot: false }), res)
+  await refreshHandler(panelReq({ method: 'POST', body: { shot: false } }), res)
   const stB = JSON.parse(res.body)
   check('panel-path-fallback', !!stB && stB.hdc === 'hdc.exe', JSON.stringify(stB && { hdc: stB.hdc, error: stB.error }))
 }
@@ -861,6 +905,78 @@ const probeWasIssued = (sink) => sink.some((c) => /devecocli|--version/i.test(c)
   check('host-flavor-catch-keeps-platform-default', !/catch\s*\{[\s\S]{0,40}shellFlavor = 'bash'/.test(hostSrc) && hostSrc.includes('shell flavor probe unavailable'), 'no forced bash fallback')
   check('host-env-gating-helpers-present', hostSrc.includes('function policyRunnable(') && hostSrc.includes('function cliDeferred(') && hostSrc.includes('function isEnvFailure('), 'gating helpers')
   check('host-tool-registry-never-throws', /function registerTool\(definition\) \{[\s\S]{0,500}catch \(e\)/.test(hostSrc), 'registerTool wrapper')
+}
+
+// ---------- 16. bounded hdc discovery ----------
+// The 4-root x 10-layout cross-product is only a candidate GENERATOR. Discovery
+// must probe existing executables only (built with node:path, so one code path
+// serves Windows and POSIX), cap the list, and never overrun its budget.
+{
+  const fx = mkdtempSync(joinPath(tmpdir(), 'dsh-hdc-cand-'))
+  const savedSdkHome = process.env.DEVECO_SDK_HOME
+  try {
+    for (const version of ['default', '10', '11', '12', '13', '14', '15']) {
+      const dir = joinPath(fx, version, 'openharmony', 'toolchains')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(joinPath(dir, process.platform === 'win32' ? 'hdc.exe' : 'hdc'), 'fake')
+    }
+    // Neutralize the dev box's own SDK root so the fixture is the only source.
+    delete process.env.DEVECO_SDK_HOME
+    const scan = existingHdcCandidates({ extraRoots: [fx], max: 5 })
+    const sep = process.platform === 'win32' ? '\\' : '/'
+    const bin = process.platform === 'win32' ? 'hdc.exe' : 'hdc'
+    check('hdc-candidates-existing-only', scan.candidates.length === 5 && scan.candidates.every((entry) => existsSync(entry.path)), JSON.stringify(scan.candidates.map((entry) => entry.path)))
+    check('hdc-candidates-platform-paths', scan.candidates.every((entry) => entry.path.includes(sep + 'openharmony' + sep + 'toolchains' + sep + bin)), scan.candidates[0] && scan.candidates[0].path)
+    check('hdc-candidates-capped', scan.truncated === true && scan.candidates.length === 5 && scan.searchedRootCount >= 1, JSON.stringify({ truncated: scan.truncated, count: scan.candidates.length }))
+    check('hdc-candidates-source-labels', scan.candidates.every((entry) => entry.source === 'discovered'), JSON.stringify(scan.candidates.map((entry) => entry.source)))
+    const roots = hdcRootCandidates([fx, fx + '/', fx.toUpperCase()])
+    check('hdc-roots-deduped', roots.filter((entry) => entry.source === 'discovered').length === 1, JSON.stringify(roots.map((entry) => entry.source)))
+    const discoverSrc = await readFile(new URL('../lib/hdc-discover.mjs', import.meta.url), 'utf8')
+    // Generic product roots are fine; a machine-specific <drive>:\Huawei root is
+    // the maintainer-path anti-pattern the v0.7.4 cleanup removed.
+    check('no-maintainer-hdc-roots', !/[A-Za-z]:[\\/]+Huawei/i.test(discoverSrc.replace(/Program Files[\\/]+Huawei/gi, '')), 'machine-specific Huawei root found in hdc-discover.mjs')
+
+    // A host that answers slowly must surface "timed out", not "not found".
+    const slowCore = createHdcCore({
+      runShellRaw: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60))
+        return { exitCode: 0, stdout: { text: '' }, stderr: { text: '' }, timedOut: true }
+      },
+      psQuote: (s) => "'" + s + "'",
+      detectShellFlavor: async () => 'pwsh',
+      getShellFlavor: () => 'pwsh',
+      setShellFlavor: () => {},
+      extraRoots: () => [fx],
+      discoveryBudgetMs: 200,
+      probeTimeoutMs: 120,
+      log: () => {},
+    })
+    const t0 = Date.now()
+    await slowCore.ensureHdc({ mode: 'workspace-write' })
+    const elapsed = Date.now() - t0
+    check('hdc-discovery-bounded', elapsed < 2000 && slowCore.candidateDiag().budgetExhausted === true, elapsed + 'ms')
+    check('hdc-discovery-timeout-not-notfound', /timed out/.test(slowCore.hdcErrorRef()) && !/hdc not found/.test(slowCore.hdcErrorRef()), String(slowCore.hdcErrorRef()).slice(0, 160))
+  } finally {
+    if (savedSdkHome === undefined) delete process.env.DEVECO_SDK_HOME
+    else process.env.DEVECO_SDK_HOME = savedSdkHome
+    try { rmSync(fx, { recursive: true, force: true }) } catch { /* best effort */ }
+  }
+}
+
+// ---------- 17. shared probe budget (hms_setup doctor) ----------
+// One hung lookup marks that item instead of consuming the whole call.
+{
+  const budget = createBudget(100)
+  const fast = await budget.probe('fast', async () => 42, 80)
+  const slow = await budget.probe('slow', () => new Promise((resolve) => setTimeout(() => resolve('late'), 500)), 80)
+  const after = await budget.probe('after', async () => 'x', 80)
+  check('budget-passes-value', fast.status === 'ok' && fast.value === 42, JSON.stringify(fast))
+  check('budget-times-out', slow.status === 'timeout' && budget.timedOutLabels().includes('slow'), JSON.stringify(slow))
+  check('budget-skips-when-exhausted', after.status === 'skipped' && budget.skippedLabels().includes('after'), JSON.stringify({ after, elapsed: budget.elapsed() }))
+  check('budget-reports-partial', budget.partial() === true && budget.problems().length === 2 && budget.elapsed() < 500, JSON.stringify(budget.problems()))
+  // A failing probe is recorded as an error, never thrown at the caller.
+  const failing = await createBudget(1000).probe('boom', async () => { throw new Error('nope') }, 100)
+  check('budget-error-not-thrown', failing.status === 'error' && /nope/.test(failing.error), JSON.stringify(failing))
 }
 
 // ---------- summary ----------

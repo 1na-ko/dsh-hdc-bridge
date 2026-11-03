@@ -39,7 +39,7 @@
 | `hdc_crash` | 崩溃抓取：faultlogger 目录里最近的 jscrash / cppcrash / appfreeze，可按包名过滤，并解析结构化摘要（错误名/信息/错误码/源码帧/已知错误码提示） |
 | `hdc_diag` | 诊断：shell 口味 / hdc 路径 / 策略解析 / 探测日志 |
 | 错误码提示 | install / app / build 失败按 11 条已知错误码附中文修复建议（9568332 签名未绑 UDID→AGC 登记设备、9568289/9568322 签名配置、1300002 空间不足…）；签名类错误附三类修复（AGC 证书配置 / 重装自签名 / 换 debug 签名）+ 直达 AGC 链接 |
-| `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警；CLT 形态额外回显 `apiVersion` 与根识别方式（version.txt / sdk-pkg.json） |
+| `hms_setup` | 环境体检：hdc / DevEco Studio / SDK(API 版本) / devecocli / 设备五项 + 目标 API 版本三源解析（项目→设备→SDK）与不一致告警；**每一项独立超时、共享 20s 预算**，卡住的一项只标记 `timedOut/skipped` 并回 `partial`+`probeTimeouts`+`elapsedMs`，不再拖住整次调用；CLT 形态额外回显 `apiVersion` 与根识别方式（version.txt / sdk-pkg.json） |
 | `hms_build` | 官方构建/签名/运行通道：status / build / run / sign / clean；devecocli 缺失时自动回退本机 hvigorw + hdc_install + hdc_app 闭环 |
 | `hms_api` | 官方优先的版本化 API 知识：读本机 SDK `.d.ts`（`@since`/`@deprecated`/`@syscap` 精确到 API 版本），按目标版本分类"可用/已废弃/不可用" |
 | `hms_knowledge` | **离线随包官方知识层（Tier-1）**：OpenHarmony 官方文档（CC-BY-4.0）未改文字节选 **28 篇**高频 API 模块、窗口（window/Window 类）、导航组件 Navigation 与应用模型/ArkTS 指南（大文件按节选入，文件内附节选声明），无需 SDK/CLI/网络。catalog / read（先目录后按小节读）/ search |
@@ -97,6 +97,7 @@ dsh --profile <name>
 - 工具按调用会话解析沙箱策略（会话 cwd 为工作区边界）
 - 截图默认写入 `<workspace>/.dsh-hdc/screenshots/`，建议加入项目 `.gitignore`
 - 若部署沙箱 runner 不可用（`SandboxUnavailableError`），按 DSH 规范对单条命令以更宽模式升级重试；hvigor 构建因其用户级缓存（`~/.hvigor`、npm 缓存）在工作区外，通常需要该升级
+- 面板四条路由按同源控制面收口（Host / Origin / `Sec-Fetch-Site` / 回环对端 / JSON content-type 五重检查，见「面板与 REST」）；经转发或隧道访问需在 `DSH_HDC_BRIDGE_TRUSTED_HOSTS` 显式登记对外主机
 - devecocli 内部会派生管道 stdio 子进程（签名校验、hvigor fork）：在受限沙箱会话中会报 EPERM/误报"未签名"，工具透传官方错误原文并给出沙箱外执行指引（build/run/sign 官方本就标注 [Outside sandbox]）
 
 ## 实测矩阵
@@ -118,6 +119,7 @@ dsh --profile <name>
 | v0.7.4 统一 hdc 发现（issue #4 回归） | 工具层候选全败时 PATH 回退命中、面板复用工具层解析结果、面板自身 PATH 回退三场景断言 ✓（smoke）；真机环境经 `DEVECO_SDK_HOME` 动态根端到端解析直连 ✓ |
 | v0.9 回归 | 25 工具 + 5 运行时技能 + 4 REST 路由 + 官方 slots 面板 + 知识层 28 篇读取（发布前 smoke） |
 | 社区 issue 批次（#8-#13）回归 | Windows + DSH 0.2.0-rc.2 实测：shell 双 seam 兼容（新线 execute / 旧线 run）、bash 宿主先探口味再探 CLI、无 version.txt 的 CLT 树识别 + 世代门、arkts_check 的 Studio→CLT 回退、hms_lint 经 --output-path 取回报表；smoke 118 项断言全绿（含假 CLT 树/假 seam/假 CLI 写报表的行为级用例） |
+| v0.10.3 回归 | smoke **155 项** ALL PASS（新增 14 项面板栅栏、10 项有界发现、5 项预算断言）；另用真实 `http.createServer` 挂载四条路由做端到端核对：伪造 Host / 跨站 Origin / `Sec-Fetch-Site: cross-site` / 表单 POST 全部被拒，同源请求正常 200 |
 
 ## 已知限制 / Known limitations
 
@@ -262,6 +264,9 @@ dsh --profile <name>
 
 - `hdc_log action=list_devices` 返回 `devices`、全量 `targets`、`preferred`、`preferredActive`；COM 串口只保留在 `targets`。
 - `hms_build build` 返回 `backend`、`artifactVerified`、`hapBefore`、`hapAfter`；没有真实 HAP 时不得 `ok:true`。
+- `hms_setup action=doctor` 返回 `partial`、`probeTimeouts`、`budgetMs`、`elapsedMs`、`device`；单项超时出现在 `probeTimeouts` 且对应条目带 `timedOut`（不得伪装成"未安装"）。
+- `hms_setup action=paths` 返回**已存在**的 `hdcCandidates`（字符串数组）与带来源的 `candidates`（`source`: `env:DEVECO_SDK_HOME` / `discovered` / `default-root`）、`truncated`、`searchedRoots`。
+- 面板被拒绝时返回 403/415 与 `{ok:false,error,hint}`，`error` 为机器可读原因（`host-untrusted` 等）。
 - `hms_build run` fallback 返回 `stage`、`hap`、`bundleName`、`target`、`start.ok`、`missionVerified`。
 - `build_project` 返回 `artifactStale`、`hapBefore`、`hapAfter`、`backend`；`clean:true` 的 `command` 明确显示 clean → build。
 - `start_app` 未传 `hvd` 时返回 `availableDevices`，只做发现；传入 `hvd` 后才允许部署和启动。
@@ -293,18 +298,22 @@ dsh --profile <name>
 
 ## 面板与 REST
 
-Web profile 注册以下路由：
+Web profile 注册以下路由（均为 `webServer.register({kind:'exact'})`）：
 
-- `/api2/hdc-bridge/panel-state`：设备、工具链、SDK/API 和面板状态；
-- `/api2/hdc-bridge/select`：选择会话默认设备；
-- `/api2/hdc-bridge/screenshot.jpeg`：当前目标截图；
-- `/api2/hdc-bridge/hilog`：面板日志。
+- `/api2/hdc-bridge/panel-state`（GET）：设备、工具链、SDK/API 和面板状态；
+- `/api2/hdc-bridge/refresh`（POST）：刷新面板；body `{shot:true|false,target?}`，默认含截图；
+- `/api2/hdc-bridge/select`（POST）：选择会话默认设备；
+- `/api2/hdc-bridge/screenshot.jpeg`（GET）：当前目标截图字节。
+
+这四条是**同源控制面**，不是公开 API：每个请求先过 `lib/http-guard.mjs` 的栅栏——`Host` 必须是本机回环地址、服务实际绑定地址或显式受信列表；`Sec-Fetch-Site: cross-site` 一律拒绝；带 `Origin` 时其 authority 必须与 `Host` 一致；回环 `Host` 还要求对端地址也是回环（防 DNS 重绑定）；改状态的方法必须带 `Content-Type: application/json`（简单表单请求因此无法触发截图）。被拒时返回 403/415 与机器可读 `error`（`host-untrusted` / `origin-mismatch` / `cross-site` / `peer-not-local` / `content-type`）以及修复提示。
 
 面板入口挂左侧边栏 `sidebar.footer.action` 槽位（折叠态图标 + 状态点 + 数量角标，展开态「鸿蒙」标签贴排）；点击经 ReactDOM portal 打开右上角浮动面板（可拖拽、八向缩放、收起、归位、× 关闭），样式使用 DSH 官方 `--dsw-alias-*` token 和 `data-plugin-css` 注入，随平台生命周期卸载。
 
+**经局域网转发或隧道访问时**（`remote-web-ui` 的局域网开关、`cloudflared` 等）：浏览器看到的 `Host` 不再是被绑定的回环地址，面板会按设计拒绝并显示该原因。把对外域名/地址加入 `DSH_HDC_BRIDGE_TRUSTED_HOSTS`（逗号或空格分隔，条目可写 `host` 或 `host:port`；无端口的条目匹配任意端口）即可放行，例如 `DSH_HDC_BRIDGE_TRUSTED_HOSTS=panel.example,192.168.1.20`。拒绝原因会以 `[hdc-bridge] panel request refused (...)` 打进宿主日志（同一 reason+host 只记一次）；面板不可用时 `hdc_*` / `hms_*` 工具不受影响。
+
 ## 工具链探测和沙箱
 
-Windows 探测顺序为：显式路径/环境变量 → 注册表（含 WOW6432Node）→ PATH 反查 → 常见 DevEco Studio/SDK 目录。Studio 根目录继续用于定位 SDK API、JBR Java、hvigorw 和 `hdc.exe`。
+Windows 探测顺序为：显式路径/环境变量 → 注册表（含 WOW6432Node）→ PATH 反查 → 常见 DevEco Studio/SDK 目录。Studio 根目录继续用于定位 SDK API、JBR Java、hvigorw 和 `hdc.exe`。hdc 候选清单是「根 × 版本布局 × 平台拼写」的**生成器**：探测前先按 `node:path` 过滤出真实存在的可执行文件、去重、封顶 5 条，并给每条标注来源；探测按单条 4s 超时 + 20s 总预算推进，超预算时把 `hdc_diag` / `hms_setup` 报成「探测超时」（带候选与根清单），不再退化成 `hdc not found`——80 条候选 × 12s 把一次 doctor 拖到两分钟以上的问题由此关闭。
 
 构建、运行、签名、compat 等官方命令可能被 DSH 受限策略阻断。插件会返回 `mojoFatal` 或 `outsideWorkspace`，并在可行时切换到本地 hvigorw/hdc 回退；回退必须通过真实产物、安装结果和 mission 检查。所有插件管理的 hvigor 任务都会先在项目内的 `.dsh-hvigor-tmp` 设置 `HVIGOR_USER_HOME` 和 `BUILD_CACHE_DIR`（后者把 build.log 等项目缓存也收进隔离目录），首次运行时复用默认 hvigor home 已缓存的 wrapper/pnpm，执行 `hvigorw --stop-daemon`，再注入 DevEco Studio JBR 的 `JAVA_HOME` 和 `bin` 到 `PATH`，最后以 `--no-daemon` 执行，避免旧 daemon 缓存裸 `java` 环境导致 `spawn java ENOENT`（包括 `app_packing_tool.jar` / `onDeviceTest` 类任务）。停止旧 daemon 若被宿主权限策略拒绝不会阻断当前的无 daemon 任务；任务本身仍按真实退出码和产物校验判定成功。`hms_emulator list` 与 `hms_api_change` 的 JSON 通道为空时，包装层会重试宿主策略并回退到 `devecocli emulator list` / `check compat versions` 的纯文本输出（compat 回退合并 stderr 透传官方原文，且 Studio 低于 `26.0.0.810` 时由本地版本前置直接合成官方报错），成功路径也始终返回可读 output；`hms_emulator list` 先确保 hdc 已初始化，再在 hdc 有 Connected 模拟器目标时用 hdc 事实回填，`start` 会幂等轮询任意 Connected 模拟器目标（兼容 devecocli 的 `status`/`state`/`isRunning` 字段）到 running 才报成功。`hms_build` / `build_project` 返回体带 `daemonStopped`、`javaHome`、`hvigorUserHome`、`buildCacheDir` 诊断字段。签名 OAuth 仍需用户在宿主终端执行一次 `devecocli auth login`。
 
@@ -333,6 +342,7 @@ Windows + DevEco Studio 6.1.1.300 + SDK API 24 + TCP 真机 `192.168.1.11:12345`
 - [x] macOS 宿主路径兼容（v0.9.1：社区报告 + 实测验证，joinPath 化修复截图/dump 暂存路径；其余工具待完整实机回归）
 - [x] 统一 hdc 发现 + 支持独立 Command Line Tools（v0.10：面板/工具层单源探测、DEVECO_SDK_HOME 动态根、CLT >=26 双形态识别，SDK/hdc/hvigorw/codelinter 全链自动覆盖，Linux 仅 CLT 形态）
 - [x] 社区 issue 批次 #8-#13（DSH 0.2.0-rc.2 shell 契约迁移 + 双 seam 垫片、bash 宿主 CLI 探测与负缓存失效、无 version.txt 的 CLT 发现与世代门、构建产物判定与 hvigorw node 前缀、arkts_check CLT 回退、lint 报表落盘）
+- [x] v0.10.3 安全与健壮性（面板四条路由的同源栅栏：Host / Origin / `Sec-Fetch-Site` / 回环对端 / JSON content-type，隧道与局域网经 `DSH_HDC_BRIDGE_TRUSTED_HOSTS` 白名单；hdc 发现只探测真实存在的候选、去重封顶、按平台拼写，单条 4s + 总 20s 预算，超时不再伪装成 not found；`hms_setup` 逐项超时与共享预算 `partial/probeTimeouts/elapsedMs`）
 
 ## License
 
