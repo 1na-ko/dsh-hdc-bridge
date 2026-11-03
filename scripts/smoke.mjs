@@ -20,6 +20,23 @@ function check(name, cond, extra) {
   console.log((cond ? 'PASS' : 'FAIL') + ' [' + name + ']' + (cond || extra === undefined ? '' : ' ' + extra))
   if (!cond) failures += 1
 }
+// ---------- hermetic SDK root ----------
+// Discovery only probes candidates that really exist on disk, so the suite
+// provides one: a temp SDK root exposing a dummy hdc binary, pointed at by
+// DEVECO_SDK_HOME for the whole run. Without it every hdc_* case would depend
+// on the developer machine having DevEco Studio installed (CI has neither), and
+// the fake shell could never be reached. Blocks that need a different root
+// (CLT fixtures, the PATH-fallback case) override or delete the variable
+// themselves and restore it afterwards.
+const suiteSdkHome = mkdtempSync(joinPath(tmpdir(), 'dsh-smoke-sdk-'))
+const savedSuiteSdkHome = process.env.DEVECO_SDK_HOME
+{
+  const toolchains = joinPath(suiteSdkHome, 'default', 'openharmony', 'toolchains')
+  mkdirSync(toolchains, { recursive: true })
+  writeFileSync(joinPath(toolchains, process.platform === 'win32' ? 'hdc.exe' : 'hdc'), 'smoke fake hdc')
+  process.env.DEVECO_SDK_HOME = suiteSdkHome
+}
+
 // ---------- fake harness ----------
 const registered = []
 const skills = []
@@ -980,6 +997,9 @@ const probeWasIssued = (sink) => sink.some((c) => /devecocli|--version/i.test(c)
 }
 
 // ---------- summary ----------
+if (savedSuiteSdkHome === undefined) delete process.env.DEVECO_SDK_HOME
+else process.env.DEVECO_SDK_HOME = savedSuiteSdkHome
+try { rmSync(suiteSdkHome, { recursive: true, force: true }) } catch { /* best effort */ }
 console.log('')
 console.log(failures === 0 ? 'SMOKE ALL PASS' : 'SMOKE FAILURES: ' + failures)
 process.exit(failures === 0 ? 0 : 1)
