@@ -6,9 +6,13 @@ node_modules/
 Thumbs.db
 CONTINUITY.md
 REVIEW-BRIEF-pr5.md
-`.hvigor/
+.hvigor/
 
-# local debug/verification sandbox.tmp-verify/
+# local debug/verification sandboxes (never shipped, never committed)
+.tmp/
+.tmp-verify/
+.rc6-probe/
+.pr6-copy/
+
 # lockfile is not shipped (zero-runtime-dependency plugin)
 package-lock.json
-.pr6-copy/
